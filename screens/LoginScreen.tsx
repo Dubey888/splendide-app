@@ -30,13 +30,14 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}?accion=login`, {
-        email: email,
-        password: password
-      }, {
+      // 1. CORRECCIÓN: Usar FormData para que PHP reciba los datos por $_POST
+      const formData = new FormData();
+      formData.append('email', email.trim());
+      formData.append('password', password);
+
+      const res = await axios.post(`${API_BASE_URL}?accion=login`, formData, {
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'multipart/form-data',
         }
       });
 
@@ -52,7 +53,8 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         }
       }
 
-      if (data.status === 'success') {
+      // Verificamos "success" o "exito" dependiendo de cómo responda tu API
+      if (data.status === 'success' || data.exito === true) {
         const userData = data.usuario || data.data || data;
         const userId = userData.id || userData.user_id;
         const userRol = userData.rol;
@@ -72,11 +74,11 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         await AsyncStorage.setItem('userId', userId.toString());
         await AsyncStorage.setItem('userRol', userRol);
 
-        // Navegación estándar de React Navigation
-        navigation.replace('PedidosScreen');
+        // 2. CORRECCIÓN: Redirigir a 'MainTabs' en lugar de 'PedidosScreen'
+        navigation.replace('MainTabs');
         
       } else {
-        mostrarAlertaSegura(data.mensaje || "Credenciales incorrectas.");
+        mostrarAlertaSegura(data.mensaje || data.error || "Credenciales incorrectas.");
       }
     } catch (error: any) {
       console.error("Error de petición:", error);
