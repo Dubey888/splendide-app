@@ -103,13 +103,57 @@ const seleccionarImagen = async () => {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
-      base64: true, // La corrección correcta
     });
 
     if (!result.canceled) {
-      // Restauramos la lógica original que tenías en esta pantalla
       setImagenLocalUri(result.assets[0].uri);
-      setImagenBase64(result.assets[0].base64 || null);
+      // Ya no necesitamos base64, subiremos directamente con FormData
+      subirACloudinaryDirecto(result.assets[0]);
+    }
+  };
+
+  const subirACloudinaryDirecto = async (foto: any) => {
+    setGuardando(true);
+    const data = new FormData();
+
+    if (Platform.OS === 'web') {
+      try {
+        const responseFetch = await fetch(foto.uri);
+        const blob = await responseFetch.blob();
+        data.append('file', blob, 'coleccion.jpg');
+      } catch (e) {
+        Alert.alert("Error", "No se pudo procesar la imagen en la web.");
+        setGuardando(false);
+        return;
+      }
+    } else {
+      data.append('file', {
+        uri: foto.uri,
+        type: 'image/jpeg',
+        name: 'coleccion.jpg',
+      } as any);
+    }
+
+    data.append('upload_preset', 'njjetabd'); 
+    data.append('cloud_name', 'sngqwvpv');
+
+    try {
+      const res = await fetch('https://api.cloudinary.com/v1_1/sngqwvpv/image/upload', {
+        method: 'POST',
+        body: data,
+      });
+      const result = await res.json();
+
+      if (result.secure_url) {
+        // Guardamos directamente la URL final que nos devuelve Cloudinary
+        setFormImagenUrl(result.secure_url);
+      } else {
+        Alert.alert("Error", result.error?.message || "Cloudinary no devolvió la URL de la imagen.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "No se pudo subir la foto a Cloudinary");
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -119,37 +163,13 @@ const seleccionarImagen = async () => {
       return; 
     }
     setGuardando(true);
-    let urlFinal = formImagenUrl; 
 
     try {
-      // Subir imagen en Base64 al backend PHP para que este gestione Cloudinary con seguridad
-      if (imagenLocalUri && imagenBase64) {
-        const payloadImagen = {
-          imagen_base64: `data:image/jpeg;base64,${imagenBase64}`, // Usamos el estado directamente
-          folder: 'colecciones'
-        };
-
-        const cloudinaryPhpRes = await fetch(`${API_URL}?accion=subir_imagen_cloudinary`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payloadImagen)
-        });
-        const cloudData = await cloudinaryPhpRes.json();
-
-        if (cloudData.status === 'success' || cloudData.secure_url) {
-          urlFinal = cloudData.secure_url || cloudData.url;
-        } else {
-          Alert.alert("Error", cloudData.message || "No se pudo subir la imagen al servidor.");
-          setGuardando(false);
-          return;
-        }
-      }
-      
       const payload = { 
         id: vistaDetalleActiva ? vistaDetalleActiva.id : 0,
         nombre: formNombre, 
         tienda: formTienda, 
-        imagen_url: urlFinal 
+        imagen_url: formImagenUrl // Usamos la URL limpia obtenida directamente de Cloudinary
       };
 
       const saveRes = await fetch(`${API_URL}?accion=guardar_coleccion`, { 
@@ -163,7 +183,7 @@ const seleccionarImagen = async () => {
         setModalVisible(false);
         cargarColecciones(); 
         if (vistaDetalleActiva) {
-          setVistaDetalleActiva({...vistaDetalleActiva, nombre: formNombre, tienda: formTienda, imagen_url: urlFinal});
+          setVistaDetalleActiva({...vistaDetalleActiva, nombre: formNombre, tienda: formTienda, imagen_url: formImagenUrl});
         }
         Alert.alert("Éxito", "Colección guardada correctamente.");
       } else { 

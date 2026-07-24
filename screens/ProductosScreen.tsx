@@ -166,52 +166,58 @@ export default function ProductosScreen({ navigation }: any) {
     }
   };
 
-  const seleccionarImagen = async () => {
-    const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permiso.granted) {
-      Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.');
-      return;
-    }
-
+const seleccionarImagen = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
-      base64: true, // <-- AQUI ESTA LA CORRECCIÓN. Solo "base64: true"
+      quality: 0.7, 
     });
 
     if (!result.canceled) {
-      const base64 = result.assets[0].base64;
-      if (base64) {
-        subirImagenBase64(base64); 
-      } else {
-        Alert.alert("Error", "No se pudo obtener la información de la imagen.");
-      }
+      subirACloudinary(result.assets[0]);
     }
   };
 
-  const subirImagenBase64 = async (base64String: string) => {
+  const subirACloudinary = async (foto: any) => {
     setUploadingImage(true);
+    const data = new FormData();
+    
+    if (Platform.OS === 'web') {
+      try {
+        const responseFetch = await fetch(foto.uri);
+        const blob = await responseFetch.blob();
+        data.append('file', blob, 'producto.jpg');
+      } catch (e) {
+        Alert.alert("Error", "No se pudo procesar la imagen en la web.");
+        setUploadingImage(false);
+        return;
+      }
+    } else {
+      data.append('file', {
+        uri: foto.uri,
+        type: 'image/jpeg',
+        name: 'producto.jpg',
+      } as any);
+    }
+    
+    data.append('upload_preset', 'njjetabd'); 
+    data.append('cloud_name', 'sngqwvpv');
+
     try {
-      // Ya no necesitamos FileSystem.readAsStringAsync
-      const payload = { 
-        imagen_base64: `data:image/jpeg;base64,${base64String}`,
-        folder: 'productos'
-      };
-
-      const res = await axios.post(`${API_BASE_URL}?accion=subir_imagen_cloudinary`, payload, {
-        headers: { 'Content-Type': 'application/json' }
+      const res = await fetch('https://api.cloudinary.com/v1_1/sngqwvpv/image/upload', {
+        method: 'POST',
+        body: data,
       });
-
-      if (res.data.status === 'success' || res.data.secure_url) {
-        const urlImagen = res.data.secure_url || res.data.url;
-        setGaleria([...galeria, urlImagen]);
+      const result = await res.json();
+      
+      if (result.secure_url) {
+        setGaleria([...galeria, result.secure_url]);
       } else {
-        Alert.alert("Error", res.data.message || "No se pudo subir la imagen.");
+        Alert.alert("Error", result.error?.message || "Cloudinary no devolvió la URL.");
       }
     } catch (error) {
-      Alert.alert("Error", "No se pudo subir la foto.");
+      Alert.alert("Error", "No se pudo subir la foto a Cloudinary");
     } finally {
       setUploadingImage(false);
     }
