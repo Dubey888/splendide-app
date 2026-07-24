@@ -157,7 +157,7 @@ const seleccionarImagen = async () => {
     }
   };
 
-  const guardarColeccion = async () => {
+const guardarColeccion = async () => {
     if (!formNombre.trim()) { 
       Alert.alert('Error', 'El nombre de la colección es obligatorio.'); 
       return; 
@@ -166,10 +166,10 @@ const seleccionarImagen = async () => {
 
     try {
       const payload = { 
-        id: vistaDetalleActiva ? vistaDetalleActiva.id : 0,
+        id: vistaDetalleActiva ? (vistaDetalleActiva.id || vistaDetalleActiva.ID || 0) : 0,
         nombre: formNombre, 
         tienda: formTienda, 
-        imagen_url: formImagenUrl // Usamos la URL limpia obtenida directamente de Cloudinary
+        imagen_url: formImagenUrl 
       };
 
       const saveRes = await fetch(`${API_URL}?accion=guardar_coleccion`, { 
@@ -183,7 +183,12 @@ const seleccionarImagen = async () => {
         setModalVisible(false);
         cargarColecciones(); 
         if (vistaDetalleActiva) {
-          setVistaDetalleActiva({...vistaDetalleActiva, nombre: formNombre, tienda: formTienda, imagen_url: formImagenUrl});
+          setVistaDetalleActiva({
+            ...vistaDetalleActiva, 
+            nombre: formNombre, 
+            tienda: formTienda, 
+            imagen_url: formImagenUrl
+          });
         }
         Alert.alert("Éxito", "Colección guardada correctamente.");
       } else { 
