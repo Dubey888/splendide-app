@@ -23,8 +23,12 @@ export default function ColeccionesScreen({ navigation }: any) {
   const [formNombre, setFormNombre] = useState('');
   const [formTienda, setFormTienda] = useState('santuario');
   const [formImagenUrl, setFormImagenUrl] = useState('');
+  
+  // Estado para el tipo de colección (por defecto 'proveedor')
+  const [formTipo, setFormTipo] = useState('proveedor'); 
+  
   const [imagenLocalUri, setImagenLocalUri] = useState<string | null>(null);
-  const [imagenBase64, setImagenBase64] = useState<string | null>(null); // Estado para el Base64
+  const [imagenBase64, setImagenBase64] = useState<string | null>(null);
 
   useEffect(() => {
     cargarColecciones();
@@ -76,8 +80,9 @@ export default function ColeccionesScreen({ navigation }: any) {
     setFormNombre(''); 
     setFormTienda(sedeActiva); 
     setFormImagenUrl(''); 
+    setFormTipo('proveedor'); // Limpiamos el tipo al crear uno nuevo
     setImagenLocalUri(null);
-    setImagenBase64(null); // Limpiamos el Base64
+    setImagenBase64(null); 
     setModalVisible(true);
   };
 
@@ -86,12 +91,13 @@ export default function ColeccionesScreen({ navigation }: any) {
     setFormNombre(vistaDetalleActiva.nombre);
     setFormTienda(vistaDetalleActiva.tienda || 'santuario');
     setFormImagenUrl(vistaDetalleActiva.imagen_url);
+    setFormTipo(vistaDetalleActiva.tipo || 'proveedor'); // Cargamos el tipo al editar
     setImagenLocalUri(null);
-    setImagenBase64(null); // Limpiamos el Base64
+    setImagenBase64(null); 
     setModalVisible(true);
   };
 
-const seleccionarImagen = async () => {
+  const seleccionarImagen = async () => {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permiso.granted) {
       Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.');
@@ -107,7 +113,6 @@ const seleccionarImagen = async () => {
 
     if (!result.canceled) {
       setImagenLocalUri(result.assets[0].uri);
-      // Ya no necesitamos base64, subiremos directamente con FormData
       subirACloudinaryDirecto(result.assets[0]);
     }
   };
@@ -145,7 +150,6 @@ const seleccionarImagen = async () => {
       const result = await res.json();
 
       if (result.secure_url) {
-        // Guardamos directamente la URL final que nos devuelve Cloudinary
         setFormImagenUrl(result.secure_url);
       } else {
         Alert.alert("Error", result.error?.message || "Cloudinary no devolvió la URL de la imagen.");
@@ -157,7 +161,7 @@ const seleccionarImagen = async () => {
     }
   };
 
-const guardarColeccion = async () => {
+  const guardarColeccion = async () => {
     if (!formNombre.trim()) { 
       Alert.alert('Error', 'El nombre de la colección es obligatorio.'); 
       return; 
@@ -165,11 +169,13 @@ const guardarColeccion = async () => {
     setGuardando(true);
 
     try {
+      // Payload actualizado para incluir el tipo
       const payload = { 
         id: vistaDetalleActiva ? (vistaDetalleActiva.id || vistaDetalleActiva.ID || 0) : 0,
         nombre: formNombre, 
         tienda: formTienda, 
-        imagen_url: formImagenUrl 
+        imagen_url: formImagenUrl,
+        tipo: formTipo 
       };
 
       const saveRes = await fetch(`${API_URL}?accion=guardar_coleccion`, { 
@@ -187,7 +193,8 @@ const guardarColeccion = async () => {
             ...vistaDetalleActiva, 
             nombre: formNombre, 
             tienda: formTienda, 
-            imagen_url: formImagenUrl
+            imagen_url: formImagenUrl,
+            tipo: formTipo // Actualizamos el tipo en la vista activa localmente
           });
         }
         Alert.alert("Éxito", "Colección guardada correctamente.");
@@ -313,7 +320,8 @@ const guardarColeccion = async () => {
                 />
                 <View style={styles.infoList}>
                   <Text style={styles.nombreListTitle}>{item.nombre}</Text>
-                  <Text style={styles.subtitleList}>Tienda: {item.tienda}</Text>
+                  {/* Se agregó el tipo en la lista visualmente para referencia */}
+                  <Text style={styles.subtitleList}>Tienda: {item.tienda} | Tipo: {item.tipo || 'proveedor'}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#ccc" />
               </TouchableOpacity>
@@ -343,16 +351,43 @@ const guardarColeccion = async () => {
                 ) : <Text style={styles.iconoMas}>+</Text>}
               </TouchableOpacity>
             </View>
+            
             <Text style={styles.sectionTitle}>Datos Generales</Text>
             <View style={styles.cardBlanca}>
               <Text style={styles.label}>Nombre de la Marca/Colección</Text>
-              <TextInput style={styles.input} value={formNombre} onChangeText={setFormNombre} placeholder="Ej. Masglo" />
+              <TextInput 
+                style={styles.input} 
+                value={formNombre} 
+                onChangeText={setFormNombre} 
+                placeholder="Ej. Masglo" 
+              />
               
+              <Text style={styles.label}>Tipo de Colección</Text>
+              <View style={[styles.rowBotonesTienda, { marginBottom: 16 }]}>
+                {['proveedor', 'categoria'].map((t) => (
+                  <TouchableOpacity 
+                    key={t} 
+                    style={[styles.btnTienda, formTipo === t && styles.btnTiendaActivo]} 
+                    onPress={() => setFormTipo(t)}
+                  >
+                    <Text style={[styles.btnTiendaTexto, formTipo === t && styles.btnTiendaTextoActivo]}>
+                      {t === 'categoria' ? 'CATEGORÍA' : 'PROVEEDOR'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Text style={styles.label}>Asignar a Tienda</Text>
               <View style={styles.rowBotonesTienda}>
                 {['santuario', 'sanfelipe', 'ambas'].map((t) => (
-                  <TouchableOpacity key={t} style={[styles.btnTienda, formTienda === t && styles.btnTiendaActivo]} onPress={() => setFormTienda(t)}>
-                    <Text style={[styles.btnTiendaTexto, formTienda === t && styles.btnTiendaTextoActivo]}>{t.toUpperCase()}</Text>
+                  <TouchableOpacity 
+                    key={t} 
+                    style={[styles.btnTienda, formTienda === t && styles.btnTiendaActivo]} 
+                    onPress={() => setFormTienda(t)}
+                  >
+                    <Text style={[styles.btnTiendaTexto, formTienda === t && styles.btnTiendaTextoActivo]}>
+                      {t.toUpperCase()}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
