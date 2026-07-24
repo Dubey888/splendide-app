@@ -30,14 +30,14 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
     setLoading(true);
     try {
-      // 1. CORRECCIÓN: Usar FormData para que PHP reciba los datos por $_POST
-      const formData = new FormData();
-      formData.append('email', email.trim());
-      formData.append('password', password);
-
-      const res = await axios.post(`${API_BASE_URL}?accion=login`, formData, {
+      // Mantenemos tu código original con application/json que SÍ funciona con tu servidor
+      const res = await axios.post(`${API_BASE_URL}?accion=login`, {
+        email: email,
+        password: password
+      }, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
 
@@ -53,8 +53,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         }
       }
 
-      // Verificamos "success" o "exito" dependiendo de cómo responda tu API
-      if (data.status === 'success' || data.exito === true) {
+      if (data.status === 'success') {
         const userData = data.usuario || data.data || data;
         const userId = userData.id || userData.user_id;
         const userRol = userData.rol;
@@ -74,11 +73,12 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         await AsyncStorage.setItem('userId', userId.toString());
         await AsyncStorage.setItem('userRol', userRol);
 
-        // 2. CORRECCIÓN: Redirigir a 'MainTabs' en lugar de 'PedidosScreen'
+        // AQUÍ ESTABA EL ERROR LUEGO DE LOS CAMBIOS:
+        // En tu App.tsx principal la ruta ya no es 'PedidosScreen', ahora es 'MainTabs'.
         navigation.replace('MainTabs');
         
       } else {
-        mostrarAlertaSegura(data.mensaje || data.error || "Credenciales incorrectas.");
+        mostrarAlertaSegura(data.mensaje || "Credenciales incorrectas.");
       }
     } catch (error: any) {
       console.error("Error de petición:", error);

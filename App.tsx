@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,16 +13,15 @@ import ConfiguracionScreen from './screens/ConfiguracionScreen';
 import PedidosScreen from './screens/PedidosScreen';
 
 // Importación de las pantallas de la sección Productos
-import ProductosMenuScreen from './screens/ProductosMenuScreen'; // [NUEVO] Menú oscuro Shopify
-import ProductosScreen from './screens/ProductosScreen';         // Tu lista de inventario actual
-import ColeccionesScreen from './screens/ColeccionesScreen';     // La pantalla de colecciones
+import ProductosMenuScreen from './screens/ProductosMenuScreen'; 
+import ProductosScreen from './screens/ProductosScreen';         
+import ColeccionesScreen from './screens/ColeccionesScreen';     
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 const ProductosStack = createNativeStackNavigator();
 
 // 1. STACK ANIDADO PARA PRODUCTOS
-// Controla el flujo: Menú Shopify -> Inventario / Colecciones
 function ProductosStackNavigator() {
   return (
     <ProductosStack.Navigator screenOptions={{ headerShown: false }}>
@@ -56,7 +57,6 @@ function MainTabNavigator() {
           tabBarIcon: ({color, size}) => <Ionicons name="receipt" color={color} size={size}/> 
         }} 
       />
-      {/* Conectamos la pestaña Productos al Stack Anidado en lugar de la pantalla directa */}
       <Tab.Screen 
         name="Productos" 
         component={ProductosStackNavigator} 
@@ -75,14 +75,58 @@ function MainTabNavigator() {
   );
 }
 
-// 3. NAVEGADOR RAÍZ
+// 3. NAVEGADOR RAÍZ CON VERIFICACIÓN DE SESIÓN
 export default function App() {
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    verificarSesionActiva();
+  }, []);
+
+  const verificarSesionActiva = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      const userRol = await AsyncStorage.getItem('userRol');
+
+      // Si ya hay un administrador guardado, entra directo a la app
+      if (userId && userRol === 'admin') {
+        setInitialRoute('MainTabs');
+      } else {
+        setInitialRoute('LoginScreen');
+      }
+    } catch (error) {
+      console.error("Error al verificar sesión guardada:", error);
+      setInitialRoute('LoginScreen');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Pantalla de carga mientras lee el almacenamiento local del dispositivo
+  if (loading || !initialRoute) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#955F71" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="LoginScreen" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="LoginScreen" component={LoginScreen} />
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+});

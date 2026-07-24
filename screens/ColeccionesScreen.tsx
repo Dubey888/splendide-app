@@ -1,33 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, Image, TouchableOpacity, 
   ActivityIndicator, Alert, Modal, TextInput, ScrollView, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const API_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
-const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/sngqwvpv/image/upload'; 
-const UPLOAD_PRESET = 'njjetabd';
 
 export default function ColeccionesScreen({ navigation }: any) {
-  // Estado Principal
   const [colecciones, setColecciones] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [sedeActiva, setSedeActiva] = useState('santuario'); 
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Estados para Vista de Detalle (Shopify Style)
   const [vistaDetalleActiva, setVistaDetalleActiva] = useState<any | null>(null);
   const [productosColeccion, setProductosColeccion] = useState<any[]>([]);
   const [cargandoProductos, setCargandoProductos] = useState(false);
 
-  // Estados para Formulario (Crear/Editar)
   const [modalVisible, setModalVisible] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const [formId, setFormId] = useState<number | null>(null);
   const [formNombre, setFormNombre] = useState('');
-  const [formTienda, setFormTienda] = useState('ambas');
+  const [formTienda, setFormTienda] = useState('santuario');
   const [formImagenUrl, setFormImagenUrl] = useState('');
   const [imagenLocalUri, setImagenLocalUri] = useState<string | null>(null);
 
@@ -40,20 +35,26 @@ export default function ColeccionesScreen({ navigation }: any) {
     fetch(`${API_URL}?accion=obtener_colecciones&tienda=${sedeActiva}`)
       .then(res => res.json())
       .then(data => {
-        if (data.status === "success") setColecciones(data.data);
+        if (data.status === "success") {
+          setColecciones(data.data);
+        } else {
+          setColecciones([]);
+        }
       })
-      .catch(err => console.error(err))
+      .catch(err => {
+        console.error("Error cargando colecciones:", err);
+      })
       .finally(() => setCargando(false));
   };
 
-  // Al presionar una colección de la lista, abrimos la VISTA DE DETALLE
   const abrirVistaDetalle = async (coleccion: any) => {
     setVistaDetalleActiva(coleccion);
     setCargandoProductos(true);
     try {
-      // Hacemos el llamado a PHP usando tu nueva acción (obtener_por_marca)
-      const res = await fetch(`${API_URL}?accion=obtener_por_marca&marca=${coleccion.nombre}&tienda=${sedeActiva}`);
+      const urlFetch = `${API_URL}?accion=obtener_por_marca&marca=${encodeURIComponent(coleccion.nombre)}&tienda=${sedeActiva}`;
+      const res = await fetch(urlFetch);
       const data = await res.json();
+      
       if (data.status === "success") {
         setProductosColeccion(data.data);
       } else {
@@ -61,27 +62,28 @@ export default function ColeccionesScreen({ navigation }: any) {
       }
     } catch (err) {
       console.error("Error al cargar productos de colección:", err);
+      setProductosColeccion([]);
     } finally {
       setCargandoProductos(false);
     }
   };
 
-  // Filtrado de la barra de búsqueda
   const coleccionesFiltradas = colecciones.filter(c => 
-    c.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+    c.nombre && c.nombre.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Funciones del Formulario
   const abrirModalNuevo = () => {
-    setFormId(null); setFormNombre(''); setFormTienda('ambas'); setFormImagenUrl(''); setImagenLocalUri(null);
+    setFormNombre(''); 
+    setFormTienda(sedeActiva); 
+    setFormImagenUrl(''); 
+    setImagenLocalUri(null);
     setModalVisible(true);
   };
 
   const abrirModalEditar = () => {
     if (!vistaDetalleActiva) return;
-    setFormId(vistaDetalleActiva.id);
     setFormNombre(vistaDetalleActiva.nombre);
-    setFormTienda(vistaDetalleActiva.tienda);
+    setFormTienda(vistaDetalleActiva.tienda || 'santuario');
     setFormImagenUrl(vistaDetalleActiva.imagen_url);
     setImagenLocalUri(null);
     setModalVisible(true);
@@ -89,54 +91,96 @@ export default function ColeccionesScreen({ navigation }: any) {
 
   const seleccionarImagen = async () => {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permiso.granted) { Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.'); return; }
+    if (!permiso.granted) { 
+      Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.'); 
+      return; 
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.7,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+      allowsEditing: true, 
+      aspect: [1, 1], 
+      quality: 0.7,
     });
-    if (!result.canceled) setImagenLocalUri(result.assets[0].uri);
+    if (!result.canceled) {
+      setImagenLocalUri(result.assets[0].uri);
+    }
   };
 
   const guardarColeccion = async () => {
-    if (!formNombre.trim()) { Alert.alert('Error', 'El nombre de la colección es obligatorio.'); return; }
+    if (!formNombre.trim()) { 
+      Alert.alert('Error', 'El nombre de la colección es obligatorio.'); 
+      return; 
+    }
     setGuardando(true);
     let urlFinal = formImagenUrl; 
 
     try {
+      // Subir imagen en Base64 al backend PHP para que este gestione Cloudinary con seguridad
       if (imagenLocalUri) {
-        const formData = new FormData();
-        formData.append('file', { uri: imagenLocalUri, type: 'image/jpeg', name: `coleccion_${formNombre.replace(/\s+/g, '_')}.jpg` } as any);
-        formData.append('upload_preset', UPLOAD_PRESET);
-        formData.append('folder', 'colecciones');
-        const cloudinaryRes = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData, headers: { 'Content-Type': 'multipart/form-data' } });
-        const cloudData = await cloudinaryRes.json();
-        if (cloudData.secure_url) urlFinal = cloudData.secure_url;
+       const base64String = await FileSystem.readAsStringAsync(imagenLocalUri, {
+  encoding: 'base64',
+});
+
+        const payloadImagen = {
+          imagen_base64: `data:image/jpeg;base64,${base64String}`,
+          folder: 'colecciones'
+        };
+
+        const cloudinaryPhpRes = await fetch(`${API_URL}?accion=subir_imagen_cloudinary`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadImagen)
+        });
+        const cloudData = await cloudinaryPhpRes.json();
+
+        if (cloudData.status === 'success' || cloudData.secure_url) {
+          urlFinal = cloudData.secure_url || cloudData.url;
+        } else {
+          Alert.alert("Error", cloudData.message || "No se pudo subir la imagen al servidor.");
+          setGuardando(false);
+          return;
+        }
       }
       
-      const payload = { id: formId, nombre: formNombre, tienda: formTienda, imagen_url: urlFinal };
-      const saveRes = await fetch(`${API_URL}?accion=guardar_coleccion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const payload = { 
+        id: vistaDetalleActiva ? vistaDetalleActiva.id : 0,
+        nombre: formNombre, 
+        tienda: formTienda, 
+        imagen_url: urlFinal 
+      };
+
+      const saveRes = await fetch(`${API_URL}?accion=guardar_coleccion`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+      });
       const saveData = await saveRes.json();
 
       if (saveData.status === "success") {
         setModalVisible(false);
         cargarColecciones(); 
         if (vistaDetalleActiva) {
-          // Si editamos, actualizamos la vista de detalle visualmente
           setVistaDetalleActiva({...vistaDetalleActiva, nombre: formNombre, tienda: formTienda, imagen_url: urlFinal});
         }
-      } else { Alert.alert("Error", saveData.message); }
-    } catch (error) { Alert.alert("Error", "Hubo un problema al guardar la colección."); } finally { setGuardando(false); }
+        Alert.alert("Éxito", "Colección guardada correctamente.");
+      } else { 
+        Alert.alert("Error", saveData.message || "No se pudo guardar la colección."); 
+      }
+    } catch (error) { 
+      Alert.alert("Error", "Hubo un problema de conexión al guardar la colección."); 
+    } finally { 
+      setGuardando(false); 
+    }
   };
 
   const primeraImagenProducto = (urls: string) => {
-    if (!urls) return 'https://via.placeholder.com/100';
+    if (!urls || urls === 'EMPTY') return 'https://via.placeholder.com/100';
     return urls.split(',')[0].trim();
   };
 
-  // RENDER: SI HAY UNA COLECCIÓN SELECCIONADA -> MOSTRAMOS VISTA DETALLE
   if (vistaDetalleActiva) {
     return (
       <View style={styles.container}>
-        {/* Cabecera Detalle */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setVistaDetalleActiva(null)} style={{ marginRight: 15 }}>
             <Ionicons name="arrow-back" size={24} color="#000" />
@@ -148,23 +192,19 @@ export default function ColeccionesScreen({ navigation }: any) {
         </View>
 
         <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
-          {/* Imagen de Portada y Título */}
           <View style={styles.detalleHero}>
             <Image 
-              source={{ uri: vistaDetalleActiva.imagen_url || 'https://via.placeholder.com/400' }} 
+              source={{ uri: vistaDetalleActiva.imagen_url || 'https://via.placeholder.com/400?text=Sin+Foto' }} 
               style={styles.detalleImagenBig} 
             />
             <Text style={styles.detalleTitulo}>{vistaDetalleActiva.nombre}</Text>
-            <Text style={styles.detalleSubtitulo}>Descripción  ›</Text>
           </View>
 
-          {/* Carrusel de Productos de la Colección */}
           <View style={styles.detalleSeccionArticulos}>
             <View style={styles.rowBetween}>
-              <Text style={styles.tituloSeccion}>Artículos de la colección</Text>
-              <TouchableOpacity><Text style={styles.linkVerTodos}>Ver todos</Text></TouchableOpacity>
+              <Text style={styles.tituloSeccion}>Artículos de la marca</Text>
             </View>
-            <Text style={styles.textoGris}>{productosColeccion.length} artículos</Text>
+            <Text style={styles.textoGris}>{productosColeccion.length} artículos en {sedeActiva}</Text>
 
             {cargandoProductos ? (
               <ActivityIndicator color="#000" style={{marginTop: 20}} />
@@ -178,25 +218,20 @@ export default function ColeccionesScreen({ navigation }: any) {
                   </View>
                 ))}
                 {productosColeccion.length === 0 && (
-                  <Text style={{ marginTop: 20, color: '#888' }}>No hay productos con stock en esta marca.</Text>
+                  <Text style={{ marginTop: 20, color: '#888' }}>No hay productos con stock en esta sucursal.</Text>
                 )}
               </ScrollView>
             )}
           </View>
-
           <View style={{height: 100}} />
         </ScrollView>
-
-        {/* MODAL EDITAR DENTRO DEL DETALLE */}
         {renderModalFormulario()}
       </View>
     );
   }
 
-  // RENDER PRINCIPAL: VISTA DE LISTA (Buscador y Colecciones)
   return (
     <View style={styles.container}>
-      {/* Header Oscuro (Estilo Shopify Colecciones) */}
       <View style={styles.headerDark}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 15 }}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -206,39 +241,42 @@ export default function ColeccionesScreen({ navigation }: any) {
         <TouchableOpacity style={styles.iconBtnHeader} onPress={abrirModalNuevo}>
           <Ionicons name="add-circle-outline" size={26} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtnHeader}>
-          <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
-        </TouchableOpacity>
       </View>
 
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        {/* Barra de Búsqueda y Filtros */}
+        <View style={styles.selectorSedeContainer}>
+          {['santuario', 'sanfelipe', 'ambas'].map((sede) => (
+            <TouchableOpacity 
+              key={sede} 
+              style={[styles.btnSedeTab, sedeActiva === sede && styles.btnSedeTabActivo]}
+              onPress={() => setSedeActiva(sede)}
+            >
+              <Text style={[styles.textSedeTab, sedeActiva === sede && styles.textSedeTabActivo]}>
+                {sede.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <View style={styles.searchContainer}>
           <View style={styles.searchBox}>
             <Ionicons name="search" size={20} color="#888" style={{marginRight: 8}} />
             <TextInput 
               style={styles.searchInputColeccion}
-              placeholder="Buscar"
+              placeholder="Buscar colección..."
               placeholderTextColor="#888"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Ionicons name="swap-vertical" size={20} color="#333" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Ionicons name="filter" size={20} color="#333" />
-          </TouchableOpacity>
         </View>
 
-        {/* Lista de Colecciones */}
         {cargando ? (
           <ActivityIndicator size="large" color="#000" style={{ marginTop: 40 }} />
         ) : (
           <FlatList
             data={coleccionesFiltradas}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item, index) => item.id ? item.id.toString() : index.toString()}
             renderItem={({ item }) => (
               <TouchableOpacity style={styles.itemList} onPress={() => abrirVistaDetalle(item)}>
                 <Image 
@@ -247,27 +285,25 @@ export default function ColeccionesScreen({ navigation }: any) {
                 />
                 <View style={styles.infoList}>
                   <Text style={styles.nombreListTitle}>{item.nombre}</Text>
-                  <Text style={styles.subtitleList}>Colección • {item.tienda}</Text>
+                  <Text style={styles.subtitleList}>Tienda: {item.tienda}</Text>
                 </View>
+                <Ionicons name="chevron-forward" size={20} color="#ccc" />
               </TouchableOpacity>
             )}
             ItemSeparatorComponent={() => <View style={styles.separador} />}
           />
         )}
       </View>
-
-      {/* MODAL CREAR DESDE LA LISTA */}
       {renderModalFormulario()}
     </View>
   );
 
-  // Función Auxiliar para no repetir el código del Modal
   function renderModalFormulario() {
     return (
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitulo}>{formId ? 'Editar Colección' : 'Nueva Colección'}</Text>
+            <Text style={styles.modalTitulo}>{vistaDetalleActiva ? 'Editar Colección' : 'Nueva Colección'}</Text>
             <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.btnCancelar}>Cancelar</Text></TouchableOpacity>
           </View>
           <ScrollView style={styles.modalBody}>
@@ -281,9 +317,10 @@ export default function ColeccionesScreen({ navigation }: any) {
             </View>
             <Text style={styles.sectionTitle}>Datos Generales</Text>
             <View style={styles.cardBlanca}>
-              <Text style={styles.label}>Nombre de la Colección</Text>
-              <TextInput style={styles.input} value={formNombre} onChangeText={setFormNombre} placeholder="Ej. Atenea" />
-              <Text style={styles.label}>Tienda / Sede</Text>
+              <Text style={styles.label}>Nombre de la Marca/Colección</Text>
+              <TextInput style={styles.input} value={formNombre} onChangeText={setFormNombre} placeholder="Ej. Masglo" />
+              
+              <Text style={styles.label}>Asignar a Tienda</Text>
               <View style={styles.rowBotonesTienda}>
                 {['santuario', 'sanfelipe', 'ambas'].map((t) => (
                   <TouchableOpacity key={t} style={[styles.btnTienda, formTienda === t && styles.btnTiendaActivo]} onPress={() => setFormTienda(t)}>
@@ -305,55 +342,37 @@ export default function ColeccionesScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' }, // Fondo negro para el header dark
-  
-  // ESTILOS HEADER LISTA (Shopify Dark)
-  headerDark: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingBottom: 15,
-    backgroundColor: '#000',
-  },
+  container: { flex: 1, backgroundColor: '#000' }, 
+  headerDark: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingBottom: 15, backgroundColor: '#000' },
   tituloDark: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginLeft: 5 },
   iconBtnHeader: { marginLeft: 15 },
-
-  // ESTILOS BARRA BÚSQUEDA
+  selectorSedeContainer: { flexDirection: 'row', padding: 10, backgroundColor: '#f8f9fa', borderBottomWidth: 1, borderBottomColor: '#eee', gap: 6 },
+  btnSedeTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6, backgroundColor: '#e9ecef' },
+  btnSedeTabActivo: { backgroundColor: '#111' },
+  textSedeTab: { fontSize: 12, fontWeight: 'bold', color: '#555' },
+  textSedeTabActivo: { color: '#fff' },
   searchContainer: { flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f0f0', borderRadius: 8, paddingHorizontal: 10, height: 40 },
   searchInputColeccion: { flex: 1, fontSize: 16, color: '#333'  },
-  filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
-
-  // ESTILOS LISTA COLECCIONES
   itemList: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
   imagenListSquar: { width: 45, height: 45, borderRadius: 6, backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: '#eee' },
   infoList: { marginLeft: 15, flex: 1 },
   nombreListTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 2 },
   subtitleList: { fontSize: 13, color: '#888' },
   separador: { height: 1, backgroundColor: '#eee', marginLeft: 76 },
-
-  // ESTILOS VISTA DETALLE
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingBottom: 10,
-    backgroundColor: '#fff', 
-  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingBottom: 10, backgroundColor: '#fff' },
   detalleHero: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   detalleImagenBig: { width: '100%', height: 200, borderRadius: 12, resizeMode: 'cover', marginBottom: 15 },
   detalleTitulo: { fontSize: 28, fontWeight: 'bold', color: '#111', marginBottom: 8 },
-  detalleSubtitulo: { fontSize: 15, color: '#555' },
-  
   detalleSeccionArticulos: { padding: 16 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   tituloSeccion: { fontSize: 18, fontWeight: 'bold', color: '#111' },
-  linkVerTodos: { fontSize: 15, color: '#007AFF' },
   textoGris: { fontSize: 14, color: '#888', marginBottom: 15 },
-  
   scrollProductos: { flexDirection: 'row' },
   productoCardMini: { width: 110, marginRight: 15 },
   productoImgMini: { width: 110, height: 110, borderRadius: 10, backgroundColor: '#f4f4f4', marginBottom: 8, borderWidth: 1, borderColor: '#eee' },
   productoNombreMini: { fontSize: 13, fontWeight: '600', color: '#333', marginBottom: 4 },
   productoVariantesMini: { fontSize: 12, color: '#888' },
-
-  // ESTILOS MODAL FORMULARIO
   modalContainer: { flex: 1, backgroundColor: '#f4f6f8' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
   modalTitulo: { fontSize: 18, fontWeight: 'bold' },
