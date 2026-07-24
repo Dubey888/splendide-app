@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons'; 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -169,27 +168,33 @@ export default function ProductosScreen({ navigation }: any) {
 
   const seleccionarImagen = async () => {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permiso.granted) return;
+    if (!permiso.granted) {
+      Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.');
+      return;
+    }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7, 
+      quality: 0.7,
+      base64: true, // <-- AQUI ESTA LA CORRECCIÓN. Solo "base64: true"
     });
 
     if (!result.canceled) {
-      subirImagenBase64(result.assets[0].uri);
+      const base64 = result.assets[0].base64;
+      if (base64) {
+        subirImagenBase64(base64); 
+      } else {
+        Alert.alert("Error", "No se pudo obtener la información de la imagen.");
+      }
     }
   };
 
-  const subirImagenBase64 = async (uri: string) => {
+  const subirImagenBase64 = async (base64String: string) => {
     setUploadingImage(true);
     try {
-      const base64String = await FileSystem.readAsStringAsync(uri, {
-  encoding: 'base64',
-});
-
+      // Ya no necesitamos FileSystem.readAsStringAsync
       const payload = { 
         imagen_base64: `data:image/jpeg;base64,${base64String}`,
         folder: 'productos'

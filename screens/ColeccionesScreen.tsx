@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 
 const API_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
 
@@ -25,6 +24,7 @@ export default function ColeccionesScreen({ navigation }: any) {
   const [formTienda, setFormTienda] = useState('santuario');
   const [formImagenUrl, setFormImagenUrl] = useState('');
   const [imagenLocalUri, setImagenLocalUri] = useState<string | null>(null);
+  const [imagenBase64, setImagenBase64] = useState<string | null>(null); // Estado para el Base64
 
   useEffect(() => {
     cargarColecciones();
@@ -77,6 +77,7 @@ export default function ColeccionesScreen({ navigation }: any) {
     setFormTienda(sedeActiva); 
     setFormImagenUrl(''); 
     setImagenLocalUri(null);
+    setImagenBase64(null); // Limpiamos el Base64
     setModalVisible(true);
   };
 
@@ -86,23 +87,29 @@ export default function ColeccionesScreen({ navigation }: any) {
     setFormTienda(vistaDetalleActiva.tienda || 'santuario');
     setFormImagenUrl(vistaDetalleActiva.imagen_url);
     setImagenLocalUri(null);
+    setImagenBase64(null); // Limpiamos el Base64
     setModalVisible(true);
   };
 
-  const seleccionarImagen = async () => {
+const seleccionarImagen = async () => {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permiso.granted) { 
-      Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.'); 
-      return; 
+    if (!permiso.granted) {
+      Alert.alert('Permiso denegado', 'Se requiere acceso a la galería.');
+      return;
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, 
-      allowsEditing: true, 
-      aspect: [1, 1], 
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
       quality: 0.7,
+      base64: true, // La corrección correcta
     });
+
     if (!result.canceled) {
+      // Restauramos la lógica original que tenías en esta pantalla
       setImagenLocalUri(result.assets[0].uri);
+      setImagenBase64(result.assets[0].base64 || null);
     }
   };
 
@@ -116,13 +123,9 @@ export default function ColeccionesScreen({ navigation }: any) {
 
     try {
       // Subir imagen en Base64 al backend PHP para que este gestione Cloudinary con seguridad
-      if (imagenLocalUri) {
-       const base64String = await FileSystem.readAsStringAsync(imagenLocalUri, {
-  encoding: 'base64',
-});
-
+      if (imagenLocalUri && imagenBase64) {
         const payloadImagen = {
-          imagen_base64: `data:image/jpeg;base64,${base64String}`,
+          imagen_base64: `data:image/jpeg;base64,${imagenBase64}`, // Usamos el estado directamente
           folder: 'colecciones'
         };
 
