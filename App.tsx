@@ -15,7 +15,8 @@ import PedidosScreen from './screens/PedidosScreen';
 // Importación de las pantallas de la sección Productos
 import ProductosMenuScreen from './screens/ProductosMenuScreen'; 
 import ProductosScreen from './screens/ProductosScreen';         
-import ColeccionesScreen from './screens/ColeccionesScreen';     
+import ColeccionesScreen from './screens/ColeccionesScreen';   
+import InventarioScreen from './screens/InventarioScreen'; // <-- NUEVA PANTALLA IMPORTADA  
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -24,9 +25,11 @@ const ProductosStack = createNativeStackNavigator();
 // 1. STACK ANIDADO PARA PRODUCTOS
 function ProductosStackNavigator() {
   return (
-    <ProductosStack.Navigator screenOptions={{ headerShown: false }}>
+    // Se define ProductosScreen como la vista que carga por defecto al presionar el tab
+    <ProductosStack.Navigator initialRouteName="ProductosScreen" screenOptions={{ headerShown: false }}>
+      <ProductosStack.Screen name="ProductosScreen" component={ProductosScreen} />
       <ProductosStack.Screen name="ProductosMenu" component={ProductosMenuScreen} />
-      <ProductosStack.Screen name="InventarioScreen" component={ProductosScreen} />
+      <ProductosStack.Screen name="InventarioScreen" component={InventarioScreen} />
       <ProductosStack.Screen name="ColeccionesScreen" component={ColeccionesScreen} />
     </ProductosStack.Navigator>
   );
@@ -59,7 +62,7 @@ function MainTabNavigator() {
       />
       <Tab.Screen 
         name="Productos" 
-        component={ProductosStackNavigator} 
+        component={ProductosStackNavigator} // Carga el stack anidado
         options={{ 
           tabBarIcon: ({color, size}) => <Ionicons name="pricetag" color={color} size={size}/> 
         }} 
