@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  ActivityIndicator, Modal, ScrollView, Platform 
+  ActivityIndicator, Modal, ScrollView, Platform, Image 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -110,21 +110,23 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
     navigation.replace('LoginScreen');
   };
 
+  // Colores estilo Shopify para los estados
   const colorEstadoStyle = (estado: string) => {
     switch(estado?.toLowerCase()) {
-      case 'pagado': return { bg: '#d1fae5', text: '#065f46', border: '#a7f3d0' };
-      case 'procesado': return { bg: '#dbeafe', text: '#1e40af', border: '#bfdbfe' };
-      case 'enviado': return { bg: '#f3e8ff', text: '#6b21a8', border: '#e9d5ff' };
-      case 'entregado': return { bg: '#1f2937', text: '#ffffff', border: '#111827' };
-      default: return { bg: '#f3f4f6', text: '#1f2937', border: '#e5e7eb' };
+      case 'pendiente': return { bg: '#FFEA8A', text: '#8A6116' }; // Amarillo Shopify
+      case 'pagado': return { bg: '#AEE9D1', text: '#0B572D' };    // Verde Shopify
+      case 'procesado': return { bg: '#E4E5E7', text: '#202223' }; // Gris Shopify
+      case 'enviado': return { bg: '#B4E1FA', text: '#005F96' };   // Azul Shopify
+      case 'entregado': return { bg: '#202223', text: '#FFFFFF' }; // Negro/Oscuro
+      default: return { bg: '#E4E5E7', text: '#202223' };
     }
   };
 
   if (!autorizado) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#955F71" />
-        <Text style={{marginTop: 10}}>Verificando seguridad...</Text>
+        <ActivityIndicator size="large" color="#000000" />
+        <Text style={{marginTop: 10, color: '#6D7175'}}>Verificando seguridad...</Text>
       </View>
     );
   }
@@ -132,13 +134,11 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Panel de Control</Text>
+        <Text style={styles.headerTitle}>Pedidos</Text>
         <TouchableOpacity onPress={cerrarSesion} style={styles.logoutBtn}>
           <Text style={styles.logoutText}>Salir</Text>
         </TouchableOpacity>
       </View>
-
-      <Text style={styles.sectionTitle}>Gestión de Pedidos Activos</Text>
 
       <FlatList
         data={pedidos}
@@ -157,8 +157,8 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
         renderItem={({ item }) => {
           const badge = colorEstadoStyle(item.estado_pago);
           return (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity style={styles.card} onPress={() => abrirDetalles(item)} activeOpacity={0.7}>
+              <View style={styles.cardTopRow}>
                 <Text style={styles.orderId}>#{item.id}</Text>
                 <Text style={styles.dateText}>
                   {item.fecha_pedido ? new Date(item.fecha_pedido).toLocaleDateString() : 'Sin fecha'}
@@ -169,117 +169,150 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                 {item.nombre_entrega} {item.apellidos_entrega}
               </Text>
               
-              <View style={styles.cardFooter}>
-                <Text style={styles.totalText}>
-                  ${Number(item.total_pagar || 0).toLocaleString('es-CO')}
-                </Text>
-                <View style={[styles.badge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
+              <View style={styles.cardBottomRow}>
+                <View style={[styles.badge, { backgroundColor: badge.bg }]}>
                   <Text style={[styles.badgeText, { color: badge.text }]}>
                     {(item.estado_pago || 'Pendiente').toUpperCase()}
                   </Text>
                 </View>
+                <Text style={styles.totalText}>
+                  ${Number(item.total_pagar || 0).toLocaleString('es-CO')}
+                </Text>
               </View>
-
-              <TouchableOpacity style={styles.detailsBtn} onPress={() => abrirDetalles(item)}>
-                <Text style={styles.detailsBtnText}>Ver detalles</Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
 
-      {/* MODAL DE DETALLES */}
+      {/* MODAL DE DETALLES (ESTILO SHOPIFY) */}
       <Modal visible={modalAbierto} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             
+            {/* Header del Modal */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Pedido #{pedidoSeleccionado?.id}</Text>
-              <TouchableOpacity onPress={() => setModalAbierto(false)}>
-                <Text style={styles.closeBtnText}>Cerrar</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.modalTitle}>#{pedidoSeleccionado?.id}</Text>
+                <View style={[styles.badge, { backgroundColor: colorEstadoStyle(pedidoSeleccionado?.estado_pago).bg, marginLeft: 10 }]}>
+                  <Text style={[styles.badgeText, { color: colorEstadoStyle(pedidoSeleccionado?.estado_pago).text }]}>
+                    {(pedidoSeleccionado?.estado_pago || 'Pendiente').toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setModalAbierto(false)} style={styles.closeButton}>
+                <Text style={styles.closeBtnText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.infoGrid}>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoLabel}>Nombre de entrega:</Text>
-                  <Text style={styles.infoValue}>{pedidoSeleccionado?.nombre_entrega} {pedidoSeleccionado?.apellidos_entrega}</Text>
-                </View>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoLabel}>Contacto:</Text>
-                  <Text style={styles.infoValue}>{pedidoSeleccionado?.telefono_contacto}</Text>
-                </View>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoLabel}>Dirección:</Text>
-                  <Text style={styles.infoValue}>{pedidoSeleccionado?.direccion}, {pedidoSeleccionado?.ciudad}</Text>
-                  <Text style={styles.infoSubText}>{pedidoSeleccionado?.detalles_direccion}</Text>
-                </View>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoLabel}>Método:</Text>
-                  <Text style={styles.infoValue}>{pedidoSeleccionado?.metodo_entrega?.toUpperCase()}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.sectionSubtitle}>Productos solicitados</Text>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               
-              {cargandoDetalles ? (
-                <ActivityIndicator color="#955F71" style={{ marginVertical: 20 }} />
-              ) : (
-                <View style={styles.productList}>
-                  {detallesPedido.map((item, index) => {
-                    // Si 'producto' trae texto (ventas nuevas) lo usa, si está vacío (ventas antiguas) muestra el ID
-                    const descripcionProducto = item.producto ? item.producto : `Cód: ${item.producto_id}`;
-                    
-                    return (
-                      <View key={index} style={styles.productRow}>
-                        <View style={{ flex: 1, paddingRight: 10 }}>
-                          {/* Código de barras en una fila superior pequeña si existe la descripción */}
-                          {item.producto && (
-                            <Text style={styles.productBarcode}>{item.producto_id}</Text>
-                          )}
-                          {/* Descripción + (Variante) juntos desde la base de datos */}
-                          <Text style={styles.productName}>{descripcionProducto}</Text>
+              {/* Tarjeta de Cliente y Envío */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Cliente</Text>
+                <Text style={styles.customerDetailName}>{pedidoSeleccionado?.nombre_entrega} {pedidoSeleccionado?.apellidos_entrega}</Text>
+                <Text style={styles.contactText}>{pedidoSeleccionado?.telefono_contacto}</Text>
+                
+                <View style={styles.divider} />
+                
+                <Text style={styles.sectionTitle}>Dirección de envío</Text>
+                <Text style={styles.addressText}>{pedidoSeleccionado?.direccion}</Text>
+                <Text style={styles.addressText}>{pedidoSeleccionado?.detalles_direccion}</Text>
+                <Text style={styles.addressText}>{pedidoSeleccionado?.ciudad}</Text>
+                
+                <View style={styles.divider} />
+
+                <Text style={styles.sectionTitle}>Método</Text>
+                <Text style={styles.addressText}>{pedidoSeleccionado?.metodo_entrega?.toUpperCase()}</Text>
+              </View>
+
+              {/* Tarjeta de Productos */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Artículos ({detallesPedido.length})</Text>
+                
+                {cargandoDetalles ? (
+                  <ActivityIndicator color="#202223" style={{ marginVertical: 20 }} />
+                ) : (
+                  <View style={styles.productList}>
+                    {detallesPedido.map((item, index) => {
+                      const descripcionProducto = item.producto ? item.producto : `Producto ID: ${item.producto_id}`;
+                      // Asumimos que la API devuelve url_imagen, si no, usa un placeholder gris
+                      const imagenUrl = item.url_imagen || item.imagen || 'https://via.placeholder.com/150?text=Sin+Imagen';
+                      
+                      return (
+                        <View key={index} style={styles.productRow}>
+                          <View style={styles.productImageContainer}>
+                            <Image 
+                              source={{ uri: imagenUrl }} 
+                              style={styles.productImage}
+                              resizeMode="cover"
+                            />
+                            <View style={styles.productQtyBadge}>
+                              <Text style={styles.productQtyText}>{item.cantidad}</Text>
+                            </View>
+                          </View>
+                          
+                          <View style={styles.productInfo}>
+                            <Text style={styles.productName}>{descripcionProducto}</Text>
+                            {item.producto && (
+                              <Text style={styles.productSku}>SKU: {item.producto_id}</Text>
+                            )}
+                            <Text style={styles.productPriceUnit}>
+                              ${Number(item.precio_unitario).toLocaleString('es-CO')} c/u
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.productTotalInfo}>
+                            <Text style={styles.productPrice}>
+                              ${(item.cantidad * item.precio_unitario).toLocaleString('es-CO')}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                          <Text style={styles.productVar}>
-                            {item.cantidad}x ${Number(item.precio_unitario).toLocaleString('es-CO')}
-                          </Text>
-                          <Text style={styles.productPrice}>
-                            ${(item.cantidad * item.precio_unitario).toLocaleString('es-CO')}
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Tarjeta de Resumen Financiero */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Pago</Text>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal</Text>
+                  <Text style={styles.summaryValue}>${Number(pedidoSeleccionado?.total_pagar || 0).toLocaleString('es-CO')}</Text>
                 </View>
-              )}
-
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total a pagar</Text>
-                <Text style={styles.totalValue}>${Number(pedidoSeleccionado?.total_pagar || 0).toLocaleString('es-CO')}</Text>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Envío</Text>
+                  <Text style={styles.summaryValue}>Calculado al enviar</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.totalRow]}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalValue}>${Number(pedidoSeleccionado?.total_pagar || 0).toLocaleString('es-CO')}</Text>
+                </View>
               </View>
 
-              <Text style={styles.sectionSubtitle}>Actualizar Estado</Text>
+              {/* Acciones de Estado */}
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Actualizar Estado</Text>
+                <View style={styles.actionGrid}>
+                  <TouchableOpacity style={styles.btnOutline} onPress={() => cambiarEstado('Pendiente')}>
+                    <Text style={styles.btnOutlineText}>Pendiente</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.btnOutline} onPress={() => cambiarEstado('Pagado')}>
+                    <Text style={styles.btnOutlineText}>Pagado</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.btnOutline} onPress={() => cambiarEstado('Procesado')}>
+                    <Text style={styles.btnOutlineText}>Procesado</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.btnOutline} onPress={() => cambiarEstado('Enviado')}>
+                    <Text style={styles.btnOutlineText}>Enviado</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <TouchableOpacity style={styles.btnPrimary} onPress={() => cambiarEstado('Entregado')}>
+                  <Text style={styles.btnPrimaryText}>Marcar como Entregado</Text>
+                </TouchableOpacity>
+              </View>
               
-              <View style={styles.actionGrid}>
-                <TouchableOpacity style={[styles.btnAction, { backgroundColor: '#f3f4f6' }]} onPress={() => cambiarEstado('Pendiente')}>
-                  <Text style={styles.btnActionText}>Pendiente</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.btnAction, { backgroundColor: '#d1fae5', borderColor: '#a7f3d0', borderWidth: 1 }]} onPress={() => cambiarEstado('Pagado')}>
-                  <Text style={[styles.btnActionText, { color: '#065f46' }]}>Pagado</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.btnAction, { backgroundColor: '#dbeafe', borderColor: '#bfdbfe', borderWidth: 1 }]} onPress={() => cambiarEstado('Procesado')}>
-                  <Text style={[styles.btnActionText, { color: '#1e40af' }]}>Procesado</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.btnAction, { backgroundColor: '#f3e8ff', borderColor: '#e9d5ff', borderWidth: 1 }]} onPress={() => cambiarEstado('Enviado')}>
-                  <Text style={[styles.btnActionText, { color: '#6b21a8' }]}>Enviado</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity style={styles.btnFinalizar} onPress={() => cambiarEstado('Entregado')}>
-                <Text style={styles.btnFinalizarText}>Finalizar (Entregado)</Text>
-              </TouchableOpacity>
               <View style={{ height: 40 }} />
             </ScrollView>
           </View>
@@ -290,60 +323,76 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
-  container: { flex: 1, backgroundColor: '#f9fafb', padding: 15 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingTop: 10 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
-  logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fee2e2', borderRadius: 6 },
-  logoutText: { color: '#b91c1c', fontWeight: 'bold', fontSize: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 15, color: '#374151' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F2F4' }, // Fondo gris Shopify
+  container: { flex: 1, backgroundColor: '#F1F2F4', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20 },
   
-  emptyState: { padding: 30, alignItems: 'center' },
-  emptyText: { color: '#6b7280', fontSize: 16 },
-
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#f3f4f6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  orderId: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  dateText: { fontSize: 12, color: '#6b7280' },
-  customerName: { fontSize: 15, fontWeight: '500', color: '#374151', marginBottom: 12 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  totalText: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1 },
-  badgeText: { fontSize: 10, fontWeight: 'bold' },
-  detailsBtn: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4, borderWidth: 1, borderColor: '#955F71' },
-  detailsBtnText: { color: '#955F71', fontSize: 12, fontWeight: '600' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#f9fafb', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  closeBtnText: { fontSize: 16, color: '#6b7280', fontWeight: '500' },
-  modalBody: { padding: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerTitle: { fontSize: 24, fontWeight: '700', color: '#202223' },
+  logoutBtn: { paddingHorizontal: 12, paddingVertical: 6 },
+  logoutText: { color: '#D82C0D', fontWeight: '600', fontSize: 15 },
   
-  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20 },
-  infoBox: { width: '50%', marginBottom: 15, paddingRight: 10 },
-  infoLabel: { fontSize: 12, color: '#6b7280', marginBottom: 2 },
-  infoValue: { fontSize: 14, fontWeight: '500', color: '#111827' },
-  infoSubText: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  emptyState: { padding: 40, alignItems: 'center' },
+  emptyText: { color: '#6D7175', fontSize: 16 },
 
-  sectionSubtitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, borderBottomWidth: 1, borderColor: '#e5e7eb', paddingBottom: 5 },
-  productList: { marginBottom: 20 },
-  productRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#f3f4f6', backgroundColor: '#f9fafb', paddingHorizontal: 10, borderRadius: 6, marginBottom: 8 },
+  // Listado de pedidos (Cards)
+  card: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 8, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#E1E3E5' },
+  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  orderId: { fontSize: 16, fontWeight: '700', color: '#202223' },
+  dateText: { fontSize: 13, color: '#6D7175' },
+  customerName: { fontSize: 15, fontWeight: '400', color: '#202223', marginBottom: 16 },
+  cardBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalText: { fontSize: 16, fontWeight: '600', color: '#202223' },
   
-  // Estilo nuevo para el código de barras
-  productBarcode: { fontSize: 11, color: '#6b7280', fontWeight: '700', marginBottom: 2 },
-  productName: { fontSize: 14, fontWeight: '500', color: '#111827' },
-  productVar: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  productPrice: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginTop: 2 },
-  
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: '#FAF4F4', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(215,161,164,0.3)', marginBottom: 20 },
-  totalLabel: { fontSize: 16, fontWeight: '500', color: '#374151' },
-  totalValue: { fontSize: 20, fontWeight: 'bold', color: '#955F71' },
+  // Badges
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  badgeText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
 
+  // Modal General
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(18, 18, 18, 0.7)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#F1F2F4', borderTopLeftRadius: 16, borderTopRightRadius: 16, height: '90%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderColor: '#E1E3E5' },
+  modalTitle: { fontSize: 22, fontWeight: '700', color: '#202223' },
+  closeButton: { padding: 5, backgroundColor: '#F1F2F4', borderRadius: 20, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  closeBtnText: { fontSize: 16, color: '#6D7175', fontWeight: 'bold' },
+  modalBody: { padding: 16 },
+  
+  // Tarjetas internas del Modal
+  sectionCard: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E1E3E5', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#202223', marginBottom: 12 },
+  divider: { height: 1, backgroundColor: '#E1E3E5', marginVertical: 16 },
+
+  // Textos de cliente
+  customerDetailName: { fontSize: 15, color: '#005BD3', fontWeight: '500', marginBottom: 4 }, // Azul link Shopify
+  contactText: { fontSize: 14, color: '#6D7175' },
+  addressText: { fontSize: 14, color: '#202223', lineHeight: 20 },
+
+  // Lista de Productos en Modal
+  productList: { marginTop: 5 },
+  productRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F1F2F4' },
+  productImageContainer: { position: 'relative', marginRight: 12 },
+  productImage: { width: 50, height: 50, borderRadius: 6, borderWidth: 1, borderColor: '#E1E3E5', backgroundColor: '#F9FAFB' },
+  productQtyBadge: { position: 'absolute', top: -6, right: -6, backgroundColor: 'rgba(113, 113, 113, 0.9)', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  productQtyText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
+  productInfo: { flex: 1, justifyContent: 'center' },
+  productName: { fontSize: 14, fontWeight: '600', color: '#202223', marginBottom: 2 },
+  productSku: { fontSize: 12, color: '#6D7175', marginBottom: 2 },
+  productPriceUnit: { fontSize: 12, color: '#6D7175' },
+  productTotalInfo: { justifyContent: 'center', alignItems: 'flex-end', paddingLeft: 10 },
+  productPrice: { fontSize: 14, fontWeight: '600', color: '#202223' },
+  
+  // Resumen financiero
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  summaryLabel: { fontSize: 14, color: '#6D7175' },
+  summaryValue: { fontSize: 14, color: '#202223' },
+  totalRow: { marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderColor: '#E1E3E5', alignItems: 'center' },
+  totalLabel: { fontSize: 16, fontWeight: '600', color: '#202223' },
+  totalValue: { fontSize: 18, fontWeight: '700', color: '#202223' },
+
+  // Botones de acción
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 15 },
-  btnAction: { width: '48%', paddingVertical: 10, borderRadius: 6, alignItems: 'center', marginBottom: 10 },
-  btnActionText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  btnOutline: { width: '48%', paddingVertical: 10, borderRadius: 6, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#C9CCCF', backgroundColor: '#FFFFFF' },
+  btnOutlineText: { fontSize: 13, fontWeight: '600', color: '#202223' },
   
-  btnFinalizar: { backgroundColor: '#111827', paddingVertical: 15, borderRadius: 8, alignItems: 'center', marginTop: 5 },
-  btnFinalizarText: { color: '#fff', fontSize: 15, fontWeight: 'bold' }
+  btnPrimary: { backgroundColor: '#008060', paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginTop: 5 }, // Verde clásico de acción de Shopify
+  btnPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' }
 });
