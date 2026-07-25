@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const API_BASE_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
-const URL_TIENDA_WEB = 'https://tutienda.com/products/'; // <-- CAMBIA ESTO POR EL DOMINIO DE TU PÁGINA WEB
+const URL_TIENDA_WEB = 'https://app-8bd88649-a976-47fc-9453-ddce1d45a3fd.cleverapps.io/producto/'; // <-- CAMBIA ESTO POR EL DOMINIO DE TU PÁGINA WEB
 
 // Función para limpiar y generar el handle automáticamente
 const generarHandleAutomatico = (texto: string) => {
