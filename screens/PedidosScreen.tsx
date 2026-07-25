@@ -121,6 +121,28 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
     }
   };
 
+  // Función idéntica a ProductosScreen para extraer y limpiar la primera imagen de forma segura
+  const obtenerImagenSegura = (urlString: string) => {
+    if (!urlString) return 'https://via.placeholder.com/150?text=Sin+Imagen';
+    
+    // Si viene separada por comas (como en el catálogo), tomamos la primera
+    const imgs = urlString.split(',').map(i => i.trim()).filter(i => i !== '');
+    if (imgs.length === 0) return 'https://via.placeholder.com/150?text=Sin+Imagen';
+
+    let url = imgs[0];
+
+    // Validar si está cortada con puntos suspensivos o es inválida
+    if (url.includes('...') || url.length < 10) {
+      return 'https://via.placeholder.com/150?text=Sin+Imagen';
+    }
+
+    if (url.startsWith('http://')) {
+      url = url.replace('http://', 'https://');
+    }
+
+    return encodeURI(url);
+  };
+
   if (!autorizado) {
     return (
       <View style={styles.center}>
@@ -229,25 +251,17 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                 ) : (
                   <View style={styles.productList}>
                     {detallesPedido.map((item, index) => {
-                      
-                      // CORRECCIÓN 1: Leer "nombre_producto" en lugar de "producto"
                       const descripcionProducto = item.nombre_producto ? item.nombre_producto : `Producto ID: ${item.producto_id}`;
                       
-                     // CORRECCIÓN 2: Forzar 'https' y codificar espacios (ej. "productos shopify" -> "productos%20shopify")
-let imagenUrl = item.url_imagen ? String(item.url_imagen).trim() : 'https://via.placeholder.com/150?text=Sin+Imagen';
-
-if (imagenUrl.startsWith('http://')) {
-    imagenUrl = imagenUrl.replace('http://', 'https://');
-}
-
-// NUEVO: encodeURI convierte los espacios problemáticos en %20 para que Cloudinary no arroje error 400
-imagenUrl = encodeURI(imagenUrl);
+                      // Usamos la función robusta basada en la lógica de ProductosScreen
+                      const rawUrl = item.url_imagen || item.URL_Imagen || item.Url_Imagen || '';
+                      const imagenFinalUrl = obtenerImagenSegura(rawUrl);
                       
                       return (
                         <View key={index} style={styles.productRow}>
                           <View style={styles.productImageContainer}>
                             <Image 
-                              source={{ uri: imagenUrl }} 
+                              source={{ uri: imagenFinalUrl }} 
                               style={styles.productImage}
                               resizeMode="cover"
                             />
@@ -259,12 +273,10 @@ imagenUrl = encodeURI(imagenUrl);
                           <View style={styles.productInfo}>
                             <Text style={styles.productName}>{descripcionProducto}</Text>
                             
-                            {/* Mostrar SKU si existe */}
                             {item.producto_id && (
                               <Text style={styles.productSku}>SKU: {item.producto_id}</Text>
                             )}
                             
-                            {/* Novedad: Mostrar variante si no es nula o "Único" */}
                             {item.variante && item.variante !== '[NULL]' && item.variante !== 'Único' && (
                               <Text style={styles.productSku}>Var: {item.variante}</Text>
                             )}
