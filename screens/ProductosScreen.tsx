@@ -15,6 +15,7 @@ export default function ProductosScreen({ navigation }: any) {
   const [productos, setProductos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editData, setEditData] = useState<any>(null);
   
@@ -23,7 +24,7 @@ export default function ProductosScreen({ navigation }: any) {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('Todos');
-  const [tiendaSeleccionada, setTiendaSeleccionada] = useState('ambas'); // Inicializa en 'ambas' por defecto
+  const [tiendaSeleccionada, setTiendaSeleccionada] = useState('ambas'); 
 
   const [permisoCamara, pedirPermisoCamara] = useCameraPermissions();
   const [scannerVisible, setScannerVisible] = useState(false);
@@ -38,7 +39,6 @@ export default function ProductosScreen({ navigation }: any) {
   const loadProductos = async () => {
     setLoading(true);
     try {
-      // Mandamos la tienda seleccionada al PHP (él se encargará de filtrar o traer todos si es 'ambas')
       const res = await axios.post(`${API_BASE_URL}?accion=obtener_catalogo_web&tienda=${tiendaSeleccionada}`);
       if (res.data.status === 'success') {
         const generarHandle = (nombre: string) => {
@@ -64,7 +64,7 @@ export default function ProductosScreen({ navigation }: any) {
               stockTotal: 0, 
               cantidadVariantes: 0,
               StringImagenes: urlImagenString,
-              estado: (current.estado || current.Estado || 'activo').toLowerCase() // Recuperamos el estado de la DB
+              estado: (current.estado || current.Estado || 'activo').toLowerCase() 
             };
           }
           acc[key].stockTotal += parseInt(current.Stock) || 0;
@@ -91,10 +91,11 @@ export default function ProductosScreen({ navigation }: any) {
       Proveedor: '',
       Categoria: '',
       Tienda: tiendaSeleccionada === 'ambas' ? 'santuario' : tiendaSeleccionada, 
-      estado: 'borrador', // Los productos nuevos inician en borrador
+      estado: 'borrador', 
       ID_Shopify_Producto: '',
       Porcentaje_Venta: '30',
       Porcentaje_Mayor: '15',
+      isNew: true, // Flag para saber que es un producto nuevo (y no mostrar el botón de eliminar)
       lista_variantes: [
         {
           Codigo: '',
@@ -159,6 +160,7 @@ export default function ProductosScreen({ navigation }: any) {
           estado: (res.data.estado || item.estado || 'activo').toLowerCase(),
           Porcentaje_Venta: res.data.Porcentaje_Venta || '30',
           Porcentaje_Mayor: res.data.Porcentaje_Mayor || '15',
+          isNew: false
         });
         const urlString = res.data.Url_Imagen || res.data.URL_Imagen || res.data.url_imagen || '';
         const imagenesGuardadas = urlString 
@@ -309,7 +311,7 @@ export default function ProductosScreen({ navigation }: any) {
           descripcion: editData.Descripcion || '',
           handle: editData.Handle,
           tienda: editData.Tienda || (tiendaSeleccionada === 'ambas' ? 'santuario' : tiendaSeleccionada),
-          estado: editData.estado || 'activo', // Mandamos el estado al backend
+          estado: editData.estado || 'activo',
           variante_nombre: editData.Variante_Nombre || 'Tono',
           id_shopify_producto: editData.ID_Shopify_Producto || '',
           url_imagen: galeria.join(',') 
@@ -329,7 +331,7 @@ export default function ProductosScreen({ navigation }: any) {
       
       const res = await axios.post(`${API_BASE_URL}?accion=sincronizar_producto_completo`, payload);
       
-      if (res.data.exito) {
+      if (res.data.exito || res.data.status === 'exito') {
         Alert.alert("Éxito", "Producto guardado correctamente");
         setModalVisible(false);
         loadProductos();
@@ -340,6 +342,42 @@ export default function ProductosScreen({ navigation }: any) {
       Alert.alert("Error", "Fallo de red o servidor."); 
     } finally {
       setSaving(false);
+    }
+  };
+
+  const confirmarEliminarProducto = () => {
+    Alert.alert(
+      "Eliminar Producto",
+      `¿Estás seguro de que deseas eliminar este producto y sus variantes de la sede ${editData.Tienda.toUpperCase()}? Esta acción no se puede deshacer.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: () => eliminarProductoBackend() }
+      ]
+    );
+  };
+
+  const eliminarProductoBackend = async () => {
+    if (!editData || !editData.Codigo) return;
+    setDeleting(true);
+    try {
+      const payload = {
+        codigo: editData.Codigo.toString(),
+        tienda: editData.Tienda || tiendaSeleccionada
+      };
+      
+      const res = await axios.post(`${API_BASE_URL}?accion=eliminar_producto_completo`, payload);
+      
+      if (res.data.status === 'exito' || res.data.exito) {
+        Alert.alert("Eliminado", res.data.message || "Producto eliminado exitosamente.");
+        setModalVisible(false);
+        loadProductos();
+      } else {
+        Alert.alert("Error", res.data.message || res.data.error || "No se pudo eliminar el producto.");
+      }
+    } catch (e: any) {
+      Alert.alert("Error", "Fallo de comunicación con el servidor al eliminar.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -370,7 +408,6 @@ export default function ProductosScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* SELECTOR DE TIENDA TIPO CHIPS */}
       <View style={styles.selectorTiendaContainer}>
         <Text style={{fontSize: 11, fontWeight: 'bold', color: '#6d7175', marginBottom: 6}}>SEDE ACTIVA:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -403,7 +440,6 @@ export default function ProductosScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* TABS TIPO SHOPIFY */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop: 5}}>
           {tabsFiltro.map(tab => (
             <TouchableOpacity 
@@ -433,7 +469,6 @@ export default function ProductosScreen({ navigation }: any) {
                 <View style={styles.infoShopify}>
                   <View style={styles.tituloRow}>
                     <Text style={styles.nombreShopify} numberOfLines={2}>{item.Producto}</Text>
-                    {/* BADGE DE ESTADO SHOPIFY STYLE */}
                     <View style={[styles.badgeEstado, { backgroundColor: isActivo ? '#c3f0d5' : '#e4e5e7' }]}>
                       <Text style={[styles.badgeTexto, { color: isActivo ? '#008060' : '#454749' }]}>
                         {isActivo ? 'Activo' : 'Borrador'}
@@ -450,7 +485,6 @@ export default function ProductosScreen({ navigation }: any) {
         />
       )}
 
-      {/* MODAL SCANNER */}
       <Modal visible={scannerVisible} animationType="slide">
         <View style={styles.scannerContainer}>
           <Text style={styles.scannerText}>Escanea el código de barras</Text>
@@ -461,14 +495,15 @@ export default function ProductosScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* MODAL DE EDICIÓN Y CREACIÓN AVANZADA */}
       <Modal visible={modalVisible} animationType="slide">
         <View style={styles.modalHeader}>
-           <Text style={styles.tituloHeader}>Editar Producto</Text>
+           <Text style={styles.tituloHeader}>{editData?.isNew ? 'Nuevo Producto' : 'Editar Producto'}</Text>
            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-             <TouchableOpacity style={{marginRight: 20}} onPress={abrirVistaPrevia}>
-               <Ionicons name="eye-outline" size={24} color="#000" />
-             </TouchableOpacity>
+             {!editData?.isNew && (
+               <TouchableOpacity style={{marginRight: 20}} onPress={abrirVistaPrevia}>
+                 <Ionicons name="eye-outline" size={24} color="#000" />
+               </TouchableOpacity>
+             )}
              <TouchableOpacity onPress={() => setModalVisible(false)}>
                <Ionicons name="close" size={24} color="#000" />
              </TouchableOpacity>
@@ -478,7 +513,6 @@ export default function ProductosScreen({ navigation }: any) {
         <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
           {editData && (
             <>
-              {/* Selector de Estado tipo Shopify */}
               <View style={styles.sectionBox}>
                 <Text style={styles.sectionTitle}>Estado del producto</Text>
                 <View style={styles.statusContainer}>
@@ -503,7 +537,6 @@ export default function ProductosScreen({ navigation }: any) {
                 </Text>
               </View>
 
-              {/* Sección Multimedia */}
               <View style={styles.sectionBox}>
                 <Text style={styles.sectionTitle}>Multimedia</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.multimediaScroll}>
@@ -516,7 +549,6 @@ export default function ProductosScreen({ navigation }: any) {
                 </ScrollView>
               </View>
 
-              {/* Datos Generales */}
               <View style={styles.sectionBox}>
                 <Text style={styles.sectionTitle}>Información General</Text>
                 
@@ -528,8 +560,8 @@ export default function ProductosScreen({ navigation }: any) {
 
                 <View style={styles.row}>
                   <View style={styles.col}>
-                    <Text style={styles.label}>Código / SKU</Text>
-                    <TextInput style={styles.input} value={editData.Codigo?.toString()} onChangeText={(v) => setEditData({...editData, Codigo: v})} />
+                    <Text style={styles.label}>Código Base</Text>
+                    <TextInput style={styles.input} value={editData.Codigo?.toString()} onChangeText={(v) => setEditData({...editData, Codigo: v})} editable={editData.isNew} />
                   </View>
                   <View style={styles.col}>
                     <Text style={styles.label}>Handle (URL)</Text>
@@ -548,7 +580,6 @@ export default function ProductosScreen({ navigation }: any) {
                   </View>
                 </View>
 
-                {/* Porcentajes de Cálculo Automático */}
                 <View style={styles.porcentajesBox}>
                   <Text style={{fontWeight: 'bold', fontSize: 13, color: '#202223', marginBottom: 6}}>Cálculo de Márgenes (%)</Text>
                   <View style={styles.row}>
@@ -574,7 +605,6 @@ export default function ProductosScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {/* Variantes y SKUs */}
               <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 15, marginTop: 10}}>
                 <Text style={[styles.sectionTitle, {marginBottom: 0}]}>Variantes</Text>
                 <TouchableOpacity style={styles.btnAgregarVar} onPress={agregarVarianteFila}>
@@ -608,7 +638,6 @@ export default function ProductosScreen({ navigation }: any) {
                     </View>
                   </View>
 
-                  {/* Precios */}
                   <View style={styles.row}>
                     <View style={styles.col}>
                       <Text style={styles.label}>Costo Base ($)</Text>
@@ -628,9 +657,19 @@ export default function ProductosScreen({ navigation }: any) {
                   </View>
                 </View>
               ))}
+
+              {/* BOTÓN ELIMINAR (Solo visible si no es un producto nuevo) */}
+              {!editData.isNew && (
+                <View style={styles.deleteSection}>
+                  <TouchableOpacity style={styles.btnEliminar} onPress={confirmarEliminarProducto} disabled={deleting}>
+                    <Ionicons name="trash-outline" size={18} color="#d82c0d" style={{marginRight: 6}} />
+                    <Text style={styles.btnEliminarText}>{deleting ? "ELIMINANDO..." : "ELIMINAR PRODUCTO"}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </>
           )}
-          <View style={{height: 40}} /> 
+          <View style={{height: 60}} /> 
         </ScrollView>
 
         <View style={styles.footerButtons}>
@@ -645,47 +684,35 @@ export default function ProductosScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingBottom: 15,
-    backgroundColor: '#f4f6f8',
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, paddingBottom: 15, backgroundColor: '#f4f6f8' },
   tituloHeaderPrincipal: { fontSize: 22, fontWeight: 'bold', color: '#202223', flex: 1 },
   btnNuevoTop: { flexDirection: 'row', backgroundColor: '#000', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  
   selectorTiendaContainer: { paddingHorizontal: 15, paddingVertical: 8 },
   btnTiendaSede: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#fff', marginRight: 8, borderWidth: 1, borderColor: '#d2d5d8' },
   btnTiendaSedeActivo: { backgroundColor: '#e4e5e7', borderColor: '#202223' },
   btnTiendaSedeTexto: { color: '#6d7175', fontWeight: '600', fontSize: 12 },
   btnTiendaSedeTextoActivo: { color: '#202223' },
-
   headerControl: { marginBottom: 10, paddingHorizontal: 15, paddingTop: 5 },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, height: 44, borderWidth: 1, borderColor: '#d2d5d8' },
   searchInput: { flex: 1, fontSize: 15, color: '#202223' },
   scannerIconBox: { padding: 4, backgroundColor: '#f4f6f8', borderRadius: 6 },
-  
   tabBtn: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, backgroundColor: 'transparent', marginRight: 8 },
   tabBtnActive: { backgroundColor: '#e4e5e7' },
   tabText: { color: '#6d7175', fontWeight: '600', fontSize: 13 },
   tabTextActive: { color: '#202223' },
   emptyText: { textAlign: 'center', marginTop: 30, color: '#6d7175', fontSize: 15 },
-
-  /* ESTILOS DE LA TARJETA TIPO SHOPIFY */
   cardShopify: { flexDirection: 'row', backgroundColor: '#fff', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f4f6f8', marginHorizontal: 10, borderRadius: 8, marginBottom: 5 },
   imagenShopify: { width: 50, height: 50, borderRadius: 6, backgroundColor: '#f4f6f8', borderWidth: 1, borderColor: '#e4e5e7', resizeMode: 'cover' },
   infoShopify: { marginLeft: 12, flex: 1, justifyContent: 'center' },
   tituloRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   nombreShopify: { fontSize: 14, fontWeight: '600', color: '#202223', flex: 1, marginRight: 8 },
   detallesShopify: { color: '#6d7175', fontSize: 12, marginTop: 4 },
-  
   badgeEstado: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, alignSelf: 'flex-start' },
   badgeTexto: { fontSize: 11, fontWeight: '600' },
-  
   scannerContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   camera: { width: '100%', height: '80%' },
   scannerText: { color: '#fff', fontSize: 16, marginBottom: 20, fontWeight: 'bold', textAlign: 'center' },
   btnCancelarScanner: { backgroundColor: '#d32f2f', padding: 12, borderRadius: 8, marginTop: 20, width: '80%', alignItems: 'center' },
-
   modalHeader: { padding: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20, backgroundColor: '#f4f6f8', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   tituloHeader: { fontSize: 20, fontWeight: 'bold', color: '#202223' },
   modalScroll: { flex: 1, backgroundColor: '#f4f6f8', padding: 12 },
@@ -693,11 +720,8 @@ const styles = StyleSheet.create({
   imgThumbnail: { width: 80, height: 80, borderRadius: 8, marginRight: 8, backgroundColor: '#e4e5e7', resizeMode: 'cover', borderWidth: 1, borderColor: '#d2d5d8' },
   addBtnContainer: { width: 80, height: 80, borderRadius: 8, borderWidth: 1, borderColor: '#8c9196', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fafafa' },
   addBtnText: { fontSize: 24, color: '#8c9196' },
-  
   sectionBox: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 16, elevation: 1, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 2 },
   sectionTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 12, color: '#202223' },
-  
-  /* ESTILOS DEL SELECTOR DE ESTADO */
   statusContainer: { flexDirection: 'row', backgroundColor: '#f4f6f8', borderRadius: 8, padding: 4, marginBottom: 8 },
   statusBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
   statusBtnActive: { backgroundColor: '#c3f0d5' },
@@ -706,7 +730,6 @@ const styles = StyleSheet.create({
   statusTextActive: { color: '#008060' },
   statusTextBorrador: { color: '#454749' },
   statusDescription: { fontSize: 12, color: '#6d7175', fontStyle: 'italic' },
-
   porcentajesBox: { backgroundColor: '#fafafa', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e4e5e7', marginTop: 5 },
   varianteBox: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e4e5e7' },
   varianteTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#202223' },
@@ -714,6 +737,9 @@ const styles = StyleSheet.create({
   col: { flex: 0.48 },
   label: { fontSize: 12, color: '#6d7175', marginBottom: 4, fontWeight: '500' },
   input: { borderWidth: 1, borderColor: '#d2d5d8', padding: 10, marginBottom: 12, borderRadius: 6, backgroundColor: '#fff', color: '#202223', fontSize: 14 },
+  deleteSection: { marginTop: 15, marginBottom: 30 },
+  btnEliminar: { flexDirection: 'row', backgroundColor: '#fff', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fed3d1' },
+  btnEliminarText: { color: '#d82c0d', fontWeight: 'bold', fontSize: 14 },
   footerButtons: { padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#e4e5e7' },
   btn: { padding: 14, borderRadius: 8, alignItems: 'center' },
   btnGuardar: { backgroundColor: '#000' },
