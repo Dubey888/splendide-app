@@ -11,6 +11,17 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 const API_BASE_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
 const URL_TIENDA_WEB = 'https://tutienda.com/products/'; // <-- CAMBIA ESTO POR EL DOMINIO DE TU PÁGINA WEB
 
+// Función para limpiar y generar el handle automáticamente
+const generarHandleAutomatico = (texto: string) => {
+  if (!texto) return '';
+  return texto
+    .toLowerCase()
+    .normalize("NFD") // Descompone caracteres con acentos
+    .replace(/[\u0300-\u036f]/g, "") // Elimina los acentos
+    .replace(/[^a-z0-9]+/g, '-') // Reemplaza espacios y caracteres no alfanuméricos por guiones
+    .replace(/(^-|-$)/g, ''); // Elimina guiones al principio o al final
+};
+
 export default function ProductosScreen({ navigation }: any) {
   const [productos, setProductos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +106,7 @@ export default function ProductosScreen({ navigation }: any) {
       ID_Shopify_Producto: '',
       Porcentaje_Venta: '30',
       Porcentaje_Mayor: '15',
-      isNew: true, // Flag para saber que es un producto nuevo (y no mostrar el botón de eliminar)
+      isNew: true, 
       lista_variantes: [
         {
           Codigo: '',
@@ -553,7 +564,17 @@ export default function ProductosScreen({ navigation }: any) {
                 <Text style={styles.sectionTitle}>Información General</Text>
                 
                 <Text style={styles.label}>Nombre del Producto</Text>
-                <TextInput style={styles.input} value={editData.Producto} onChangeText={(v) => setEditData({...editData, Producto: v})} />
+                <TextInput 
+                  style={styles.input} 
+                  value={editData.Producto} 
+                  onChangeText={(v) => {
+                    setEditData({
+                      ...editData, 
+                      Producto: v,
+                      Handle: generarHandleAutomatico(v)
+                    });
+                  }} 
+                />
 
                 <Text style={styles.label}>Descripción</Text>
                 <TextInput style={[styles.input, {height: 80, textAlignVertical: 'top'}]} multiline value={editData.Descripcion} onChangeText={(v) => setEditData({...editData, Descripcion: v})} />
@@ -571,13 +592,13 @@ export default function ProductosScreen({ navigation }: any) {
 
                 <View style={styles.row}>
                   <View style={styles.col}>
-                    <Text style={styles.label}>Proveedor / Marca</Text>
-                    <TextInput style={styles.input} value={editData.Proveedor} onChangeText={(v) => setEditData({...editData, Proveedor: v})} />
-                  </View>
-                  <View style={styles.col}>
-                    <Text style={styles.label}>Categoría</Text>
-                    <TextInput style={styles.input} value={editData.Categoria} onChangeText={(v) => setEditData({...editData, Categoria: v})} />
-                  </View>
+                   <Text style={styles.label}>Proveedor / Marca</Text>
+                   <TextInput style={styles.input} value={editData.Proveedor} onChangeText={(v) => setEditData({...editData, Proveedor: v})} />
+                </View>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Categoría</Text>
+                  <TextInput style={styles.input} value={editData.Categoria} onChangeText={(v) => setEditData({...editData, Categoria: v})} />
+                </View>
                 </View>
 
                 <View style={styles.porcentajesBox}>
@@ -658,7 +679,6 @@ export default function ProductosScreen({ navigation }: any) {
                 </View>
               ))}
 
-              {/* BOTÓN ELIMINAR (Solo visible si no es un producto nuevo) */}
               {!editData.isNew && (
                 <View style={styles.deleteSection}>
                   <TouchableOpacity style={styles.btnEliminar} onPress={confirmarEliminarProducto} disabled={deleting}>
