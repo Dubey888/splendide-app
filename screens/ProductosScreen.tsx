@@ -410,14 +410,19 @@ export default function ProductosScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 15 }}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.tituloHeaderPrincipal}>Productos</Text>
-        <TouchableOpacity style={styles.btnNuevoTop} onPress={abrirNuevoProducto}>
-          <Ionicons name="add" size={22} color="#fff" />
-        </TouchableOpacity>
-      </View>
+  {/* El título ahora es un botón que navega al menú */}
+  <TouchableOpacity 
+    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} 
+    onPress={() => navigation.navigate('ProductosMenu')}
+  >
+    <Text style={styles.tituloHeaderPrincipal}>Productos</Text>
+    <Ionicons name="chevron-down" size={20} color="#202223" style={{ marginLeft: 5, marginTop: 2 }} />
+  </TouchableOpacity>
+  
+  <TouchableOpacity style={styles.btnNuevoTop} onPress={abrirNuevoProducto}>
+    <Ionicons name="add" size={22} color="#fff" />
+  </TouchableOpacity>
+</View>
 
       <View style={styles.selectorTiendaContainer}>
         <Text style={{fontSize: 11, fontWeight: 'bold', color: '#6d7175', marginBottom: 6}}>SEDE ACTIVA:</Text>
