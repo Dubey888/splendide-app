@@ -230,14 +230,18 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                   <View style={styles.productList}>
                     {detallesPedido.map((item, index) => {
                       
+                      // CORRECCIÓN 1: Leer "nombre_producto" en lugar de "producto"
                       const descripcionProducto = item.nombre_producto ? item.nombre_producto : `Producto ID: ${item.producto_id}`;
                       
-                      // Corrección aplicada: Limpieza, forzado de https y codificación de espacios con encodeURI
-                      let imagenUrl = item.url_imagen ? String(item.url_imagen).trim() : 'https://via.placeholder.com/150?text=Sin+Imagen';
-                      if (imagenUrl.startsWith('http://')) {
-                          imagenUrl = imagenUrl.replace('http://', 'https://');
-                      }
-                      imagenUrl = encodeURI(imagenUrl);
+                     // CORRECCIÓN 2: Forzar 'https' y codificar espacios (ej. "productos shopify" -> "productos%20shopify")
+let imagenUrl = item.url_imagen ? String(item.url_imagen).trim() : 'https://via.placeholder.com/150?text=Sin+Imagen';
+
+if (imagenUrl.startsWith('http://')) {
+    imagenUrl = imagenUrl.replace('http://', 'https://');
+}
+
+// NUEVO: encodeURI convierte los espacios problemáticos en %20 para que Cloudinary no arroje error 400
+imagenUrl = encodeURI(imagenUrl);
                       
                       return (
                         <View key={index} style={styles.productRow}>
@@ -255,10 +259,12 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                           <View style={styles.productInfo}>
                             <Text style={styles.productName}>{descripcionProducto}</Text>
                             
+                            {/* Mostrar SKU si existe */}
                             {item.producto_id && (
                               <Text style={styles.productSku}>SKU: {item.producto_id}</Text>
                             )}
                             
+                            {/* Novedad: Mostrar variante si no es nula o "Único" */}
                             {item.variante && item.variante !== '[NULL]' && item.variante !== 'Único' && (
                               <Text style={styles.productSku}>Var: {item.variante}</Text>
                             )}
