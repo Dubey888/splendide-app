@@ -16,7 +16,7 @@ import PedidosScreen from './screens/PedidosScreen';
 import ProductosMenuScreen from './screens/ProductosMenuScreen'; 
 import ProductosScreen from './screens/ProductosScreen';         
 import ColeccionesScreen from './screens/ColeccionesScreen';   
-import InventarioScreen from './screens/InventarioScreen'; // <-- NUEVA PANTALLA IMPORTADA  
+import InventarioScreen from './screens/InventarioScreen'; 
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -25,7 +25,6 @@ const ProductosStack = createNativeStackNavigator();
 // 1. STACK ANIDADO PARA PRODUCTOS
 function ProductosStackNavigator() {
   return (
-    // Se define ProductosScreen como la vista que carga por defecto al presionar el tab
     <ProductosStack.Navigator initialRouteName="ProductosScreen" screenOptions={{ headerShown: false }}>
       <ProductosStack.Screen name="ProductosScreen" component={ProductosScreen} />
       <ProductosStack.Screen name="ProductosMenu" component={ProductosMenuScreen} />
@@ -35,43 +34,78 @@ function ProductosStackNavigator() {
   );
 }
 
-// 2. MENÚ INFERIOR PRINCIPAL
+// 2. MENÚ INFERIOR PRINCIPAL (ESTILO SHOPIFY FLOATING PILL)
 function MainTabNavigator() {
   return (
     <Tab.Navigator 
       screenOptions={{ 
-        tabBarActiveTintColor: '#955F71',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#000', // Shopify usa negro para el icono activo
+        tabBarInactiveTintColor: '#8c9196',
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#eee' }
+        tabBarStyle: { 
+          position: 'absolute',
+          bottom: 20,
+          left: 20,
+          right: 20,
+          backgroundColor: '#ffffff',
+          borderRadius: 35, // Esto le da el diseño de "píldora" redondeada
+          height: 65,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
+          elevation: 5,
+          borderTopWidth: 0,
+        }
       }}
     >
       <Tab.Screen 
         name="Inicio" 
         component={DashboardScreen} 
         options={{ 
-          tabBarIcon: ({color, size}) => <Ionicons name="home" color={color} size={size}/> 
+          tabBarIcon: ({color, size}) => <Ionicons name="home-outline" color={color} size={26}/> 
         }} 
       />
+      
       <Tab.Screen 
         name="Pedidos" 
         component={PedidosScreen} 
         options={{ 
-          tabBarIcon: ({color, size}) => <Ionicons name="receipt" color={color} size={size}/> 
+          tabBarIcon: ({color, size}) => <Ionicons name="receipt-outline" color={color} size={26}/> 
         }} 
       />
+      
       <Tab.Screen 
         name="Productos" 
-        component={ProductosStackNavigator} // Carga el stack anidado
+        component={ProductosStackNavigator} 
         options={{ 
-          tabBarIcon: ({color, size}) => <Ionicons name="pricetag" color={color} size={size}/> 
+          // Usamos el icono relleno solo cuando está activo para dar el efecto de selección
+          tabBarIcon: ({focused, color}) => <Ionicons name={focused ? "pricetag" : "pricetag-outline"} color={color} size={26}/> 
         }} 
       />
+
+      {/* AQUÍ ESTÁ EL BOTÓN DE MENÚ INTERCALADO (HAMBURGUESA) */}
+      <Tab.Screen 
+        name="MenuAcciones" 
+        component={View} // Componente vacío de relleno
+        options={{ 
+          tabBarIcon: ({color}) => <Ionicons name="menu" color={color} size={30}/> 
+        }} 
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault(); // Evitamos que intente navegar como un Tab normal
+            
+            // Le decimos que abra la pantalla 'ProductosMenu' que está dentro del Stack de Productos
+            navigation.navigate('Productos', { screen: 'ProductosMenu' });
+          },
+        })}
+      />
+      
       <Tab.Screen 
         name="Configuracion" 
         component={ConfiguracionScreen} 
         options={{ 
-          tabBarIcon: ({color, size}) => <Ionicons name="settings" color={color} size={size}/> 
+          tabBarIcon: ({color, size}) => <Ionicons name="person-outline" color={color} size={26}/> 
         }} 
       />
     </Tab.Navigator>
@@ -92,7 +126,6 @@ export default function App() {
       const userId = await AsyncStorage.getItem('userId');
       const userRol = await AsyncStorage.getItem('userRol');
 
-      // Si ya hay un administrador guardado, entra directo a la app
       if (userId && userRol === 'admin') {
         setInitialRoute('MainTabs');
       } else {
@@ -106,11 +139,10 @@ export default function App() {
     }
   };
 
-  // Pantalla de carga mientras lee el almacenamiento local del dispositivo
   if (loading || !initialRoute) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#955F71" />
+        <ActivityIndicator size="large" color="#000" />
       </View>
     );
   }
