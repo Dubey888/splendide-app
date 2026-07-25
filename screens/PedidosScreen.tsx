@@ -110,14 +110,13 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
     navigation.replace('LoginScreen');
   };
 
-  // Colores estilo Shopify para los estados
   const colorEstadoStyle = (estado: string) => {
     switch(estado?.toLowerCase()) {
-      case 'pendiente': return { bg: '#FFEA8A', text: '#8A6116' }; // Amarillo Shopify
-      case 'pagado': return { bg: '#AEE9D1', text: '#0B572D' };    // Verde Shopify
-      case 'procesado': return { bg: '#E4E5E7', text: '#202223' }; // Gris Shopify
-      case 'enviado': return { bg: '#B4E1FA', text: '#005F96' };   // Azul Shopify
-      case 'entregado': return { bg: '#202223', text: '#FFFFFF' }; // Negro/Oscuro
+      case 'pendiente': return { bg: '#FFEA8A', text: '#8A6116' }; 
+      case 'pagado': return { bg: '#AEE9D1', text: '#0B572D' };    
+      case 'procesado': return { bg: '#E4E5E7', text: '#202223' }; 
+      case 'enviado': return { bg: '#B4E1FA', text: '#005F96' };   
+      case 'entregado': return { bg: '#202223', text: '#FFFFFF' }; 
       default: return { bg: '#E4E5E7', text: '#202223' };
     }
   };
@@ -184,12 +183,10 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
         }}
       />
 
-      {/* MODAL DE DETALLES (ESTILO SHOPIFY) */}
       <Modal visible={modalAbierto} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             
-            {/* Header del Modal */}
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.modalTitle}>#{pedidoSeleccionado?.id}</Text>
@@ -206,7 +203,6 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               
-              {/* Tarjeta de Cliente y Envío */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Cliente</Text>
                 <Text style={styles.customerDetailName}>{pedidoSeleccionado?.nombre_entrega} {pedidoSeleccionado?.apellidos_entrega}</Text>
@@ -225,7 +221,6 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                 <Text style={styles.addressText}>{pedidoSeleccionado?.metodo_entrega?.toUpperCase()}</Text>
               </View>
 
-              {/* Tarjeta de Productos */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Artículos ({detallesPedido.length})</Text>
                 
@@ -234,9 +229,15 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                 ) : (
                   <View style={styles.productList}>
                     {detallesPedido.map((item, index) => {
-                      const descripcionProducto = item.producto ? item.producto : `Producto ID: ${item.producto_id}`;
-                      // Asumimos que la API devuelve url_imagen, si no, usa un placeholder gris
-                      const imagenUrl = item.url_imagen || item.imagen || 'https://via.placeholder.com/150?text=Sin+Imagen';
+                      
+                      // CORRECCIÓN 1: Leer "nombre_producto" en lugar de "producto"
+                      const descripcionProducto = item.nombre_producto ? item.nombre_producto : `Producto ID: ${item.producto_id}`;
+                      
+                      // CORRECCIÓN 2: Forzar 'https' para que React Native no bloquee la imagen de Cloudinary
+                      let imagenUrl = item.url_imagen ? item.url_imagen : 'https://via.placeholder.com/150?text=Sin+Imagen';
+                      if (imagenUrl.startsWith('http://')) {
+                          imagenUrl = imagenUrl.replace('http://', 'https://');
+                      }
                       
                       return (
                         <View key={index} style={styles.productRow}>
@@ -253,9 +254,17 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                           
                           <View style={styles.productInfo}>
                             <Text style={styles.productName}>{descripcionProducto}</Text>
-                            {item.producto && (
+                            
+                            {/* Mostrar SKU si existe */}
+                            {item.producto_id && (
                               <Text style={styles.productSku}>SKU: {item.producto_id}</Text>
                             )}
+                            
+                            {/* Novedad: Mostrar variante si no es nula o "Único" */}
+                            {item.variante && item.variante !== '[NULL]' && item.variante !== 'Único' && (
+                              <Text style={styles.productSku}>Var: {item.variante}</Text>
+                            )}
+                            
                             <Text style={styles.productPriceUnit}>
                               ${Number(item.precio_unitario).toLocaleString('es-CO')} c/u
                             </Text>
@@ -273,7 +282,6 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                 )}
               </View>
 
-              {/* Tarjeta de Resumen Financiero */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Pago</Text>
                 <View style={styles.summaryRow}>
@@ -290,7 +298,6 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
                 </View>
               </View>
 
-              {/* Acciones de Estado */}
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Actualizar Estado</Text>
                 <View style={styles.actionGrid}>
@@ -323,7 +330,7 @@ export default function PedidosScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F2F4' }, // Fondo gris Shopify
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F2F4' }, 
   container: { flex: 1, backgroundColor: '#F1F2F4', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 50 : 20 },
   
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -334,7 +341,6 @@ const styles = StyleSheet.create({
   emptyState: { padding: 40, alignItems: 'center' },
   emptyText: { color: '#6D7175', fontSize: 16 },
 
-  // Listado de pedidos (Cards)
   card: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 8, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1, borderWidth: 1, borderColor: '#E1E3E5' },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   orderId: { fontSize: 16, fontWeight: '700', color: '#202223' },
@@ -343,11 +349,9 @@ const styles = StyleSheet.create({
   cardBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalText: { fontSize: 16, fontWeight: '600', color: '#202223' },
   
-  // Badges
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
 
-  // Modal General
   modalOverlay: { flex: 1, backgroundColor: 'rgba(18, 18, 18, 0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#F1F2F4', borderTopLeftRadius: 16, borderTopRightRadius: 16, height: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderColor: '#E1E3E5' },
@@ -356,17 +360,14 @@ const styles = StyleSheet.create({
   closeBtnText: { fontSize: 16, color: '#6D7175', fontWeight: 'bold' },
   modalBody: { padding: 16 },
   
-  // Tarjetas internas del Modal
   sectionCard: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E1E3E5', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#202223', marginBottom: 12 },
   divider: { height: 1, backgroundColor: '#E1E3E5', marginVertical: 16 },
 
-  // Textos de cliente
-  customerDetailName: { fontSize: 15, color: '#005BD3', fontWeight: '500', marginBottom: 4 }, // Azul link Shopify
+  customerDetailName: { fontSize: 15, color: '#005BD3', fontWeight: '500', marginBottom: 4 }, 
   contactText: { fontSize: 14, color: '#6D7175' },
   addressText: { fontSize: 14, color: '#202223', lineHeight: 20 },
 
-  // Lista de Productos en Modal
   productList: { marginTop: 5 },
   productRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#F1F2F4' },
   productImageContainer: { position: 'relative', marginRight: 12 },
@@ -380,7 +381,6 @@ const styles = StyleSheet.create({
   productTotalInfo: { justifyContent: 'center', alignItems: 'flex-end', paddingLeft: 10 },
   productPrice: { fontSize: 14, fontWeight: '600', color: '#202223' },
   
-  // Resumen financiero
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   summaryLabel: { fontSize: 14, color: '#6D7175' },
   summaryValue: { fontSize: 14, color: '#202223' },
@@ -388,11 +388,10 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '600', color: '#202223' },
   totalValue: { fontSize: 18, fontWeight: '700', color: '#202223' },
 
-  // Botones de acción
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 15 },
   btnOutline: { width: '48%', paddingVertical: 10, borderRadius: 6, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#C9CCCF', backgroundColor: '#FFFFFF' },
   btnOutlineText: { fontSize: 13, fontWeight: '600', color: '#202223' },
   
-  btnPrimary: { backgroundColor: '#008060', paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginTop: 5 }, // Verde clásico de acción de Shopify
+  btnPrimary: { backgroundColor: '#008060', paddingVertical: 14, borderRadius: 6, alignItems: 'center', marginTop: 5 }, 
   btnPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' }
 });
