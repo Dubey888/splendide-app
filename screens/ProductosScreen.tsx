@@ -9,17 +9,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const API_BASE_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
-const URL_TIENDA_WEB = 'https://app-8bd88649-a976-47fc-9453-ddce1d45a3fd.cleverapps.io/producto/'; // <-- CAMBIA ESTO POR EL DOMINIO DE TU PÁGINA WEB
+const URL_TIENDA_WEB = 'https://app-8bd88649-a976-47fc-9453-ddce1d45a3fd.cleverapps.io/producto/'; 
 
 // Función para limpiar y generar el handle automáticamente
 const generarHandleAutomatico = (texto: string) => {
   if (!texto) return '';
   return texto
     .toLowerCase()
-    .normalize("NFD") // Descompone caracteres con acentos
-    .replace(/[\u0300-\u036f]/g, "") // Elimina los acentos
-    .replace(/[^a-z0-9]+/g, '-') // Reemplaza espacios y caracteres no alfanuméricos por guiones
-    .replace(/(^-|-$)/g, ''); // Elimina guiones al principio o al final
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
 };
 
 export default function ProductosScreen({ navigation }: any) {
@@ -110,7 +110,9 @@ export default function ProductosScreen({ navigation }: any) {
       lista_variantes: [
         {
           Codigo: '',
+          Codigo_Anterior: '',
           Variante_Color: 'Único',
+          Color_Anterior: '',
           Precio_Compra: '',
           Precio_Venta: '',
           Precio_Mayor: '',
@@ -166,8 +168,16 @@ export default function ProductosScreen({ navigation }: any) {
       const res = await axios.get(url);
       
       if (res.data.existe) {
+        // Guardar Codigo_Anterior y Color_Anterior en cada variante (Estilo Excel)
+        const variantesConMemoria = (res.data.lista_variantes || []).map((v: any) => ({
+          ...v,
+          Codigo_Anterior: v.Codigo || '',
+          Color_Anterior: v.Variante_Color || 'Único'
+        }));
+
         setEditData({
           ...res.data,
+          lista_variantes: variantesConMemoria,
           estado: (res.data.estado || item.estado || 'activo').toLowerCase(),
           Porcentaje_Venta: res.data.Porcentaje_Venta || '30',
           Porcentaje_Mayor: res.data.Porcentaje_Mayor || '15',
@@ -294,7 +304,9 @@ export default function ProductosScreen({ navigation }: any) {
 
     const nuevaVariante = {
       Codigo: '',
+      Codigo_Anterior: '',
       Variante_Color: 'Nuevo Tono',
+      Color_Anterior: '',
       Precio_Compra: primerPrecioCompra,
       Precio_Venta: costo > 0 ? (costo + (costo * (pVentaMargen / 100))).toFixed(2) : '',
       Precio_Mayor: costo > 0 ? (costo + (costo * (pMayorMargen / 100))).toFixed(2) : '',
@@ -309,6 +321,67 @@ export default function ProductosScreen({ navigation }: any) {
     });
   };
 
+  // =========================================================
+  // ELIMINACIÓN INDIVIDUAL DE UNA VARIANTE
+  // =========================================================
+  const confirmarEliminarVariante = (index: number) => {
+    if (editData.lista_variantes.length <= 1) {
+      Alert.alert(
+        "Aviso", 
+        "El producto debe tener al menos una variante. Si deseas eliminar el producto por completo, usa el botón 'ELIMINAR PRODUCTO' de abajo."
+      );
+      return;
+    }
+
+    const varTarget = editData.lista_variantes[index];
+
+    // Si es una variante nueva recién añadida en pantalla que no existe en BD
+    if (!varTarget.Codigo_Anterior && !varTarget.Color_Anterior && editData.isNew) {
+      const filtradas = editData.lista_variantes.filter((_: any, idx: number) => idx !== index);
+      setEditData({ ...editData, lista_variantes: filtradas });
+      return;
+    }
+
+    Alert.alert(
+      "Eliminar Variante",
+      `¿Estás seguro de eliminar la variante '${varTarget.Variante_Color}' (SKU: ${varTarget.Codigo})? Se borrará de MySQL y de Shopify.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: () => eliminarVarianteBackend(index, varTarget) }
+      ]
+    );
+  };
+
+  const eliminarVarianteBackend = async (index: number, varTarget: any) => {
+    setDeleting(true);
+    try {
+      const payload = {
+        codigo: varTarget.Codigo_Anterior || varTarget.Codigo,
+        variante_color: varTarget.Color_Anterior || varTarget.Variante_Color,
+        tienda: editData.Tienda || (tiendaSeleccionada === 'ambas' ? 'santuario' : tiendaSeleccionada),
+        id_shopify_producto: editData.ID_Shopify_Producto || '',
+        id_shopify_variante: varTarget.ID_Shopify_Variante || ''
+      };
+
+      const res = await axios.post(`${API_BASE_URL}?accion=eliminar_variante`, payload);
+      
+      if (res.data.status === 'exito' || res.data.exito || res.data.success) {
+        const filtradas = editData.lista_variantes.filter((_: any, idx: number) => idx !== index);
+        setEditData({ ...editData, lista_variantes: filtradas });
+        Alert.alert("Éxito", "Variante eliminada correctamente de la tienda.");
+      } else {
+        Alert.alert("Error", res.data.message || res.data.error || "No se pudo eliminar la variante.");
+      }
+    } catch (e: any) {
+      Alert.alert("Error", "Fallo de comunicación al intentar eliminar la variante.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // =========================================================
+  // GUARDAR O RENOMBRAR PRODUCTO COMPLETO (Soporta Código_Anterior)
+  // =========================================================
   const handleSaveCompleto = async () => {
     if (!editData) return;
     setSaving(true);
@@ -328,6 +401,8 @@ export default function ProductosScreen({ navigation }: any) {
           url_imagen: galeria.join(',') 
         },
         variantes: editData.lista_variantes.map((v: any) => ({
+          codigo_anterior: v.Codigo_Anterior || '',
+          color_anterior: v.Color_Anterior || '',
           codigo: v.Codigo || editData.Codigo,
           variante_color: v.Variante_Color,
           precio_compra: parseFloat(v.Precio_Compra) || 0,
@@ -343,7 +418,7 @@ export default function ProductosScreen({ navigation }: any) {
       const res = await axios.post(`${API_BASE_URL}?accion=sincronizar_producto_completo`, payload);
       
       if (res.data.exito || res.data.status === 'exito') {
-        Alert.alert("Éxito", "Producto guardado correctamente");
+        Alert.alert("Éxito", "Producto y variantes guardadas correctamente.");
         setModalVisible(false);
         loadProductos();
       } else {
@@ -356,6 +431,9 @@ export default function ProductosScreen({ navigation }: any) {
     }
   };
 
+  // =========================================================
+  // ELIMINAR PRODUCTO Y TODAS SUS VARIANTES
+  // =========================================================
   const confirmarEliminarProducto = () => {
     Alert.alert(
       "Eliminar Producto",
@@ -373,7 +451,8 @@ export default function ProductosScreen({ navigation }: any) {
     try {
       const payload = {
         codigo: editData.Codigo.toString(),
-        tienda: editData.Tienda || tiendaSeleccionada
+        tienda: editData.Tienda || (tiendaSeleccionada === 'ambas' ? 'santuario' : tiendaSeleccionada),
+        id_shopify_producto: editData.ID_Shopify_Producto || ''
       };
       
       const res = await axios.post(`${API_BASE_URL}?accion=eliminar_producto_completo`, payload);
@@ -410,19 +489,18 @@ export default function ProductosScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-  {/* El título ahora es un botón que navega al menú */}
-  <TouchableOpacity 
-    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} 
-    onPress={() => navigation.navigate('ProductosMenu')}
-  >
-    <Text style={styles.tituloHeaderPrincipal}>Productos</Text>
-    <Ionicons name="chevron-down" size={20} color="#202223" style={{ marginLeft: 5, marginTop: 2 }} />
-  </TouchableOpacity>
-  
-  <TouchableOpacity style={styles.btnNuevoTop} onPress={abrirNuevoProducto}>
-    <Ionicons name="add" size={22} color="#fff" />
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity 
+          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} 
+          onPress={() => navigation.navigate('ProductosMenu')}
+        >
+          <Text style={styles.tituloHeaderPrincipal}>Productos</Text>
+          <Ionicons name="chevron-down" size={20} color="#202223" style={{ marginLeft: 5, marginTop: 2 }} />
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.btnNuevoTop} onPress={abrirNuevoProducto}>
+          <Ionicons name="add" size={22} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.selectorTiendaContainer}>
         <Text style={{fontSize: 11, fontWeight: 'bold', color: '#6d7175', marginBottom: 6}}>SEDE ACTIVA:</Text>
@@ -599,11 +677,11 @@ export default function ProductosScreen({ navigation }: any) {
                   <View style={styles.col}>
                    <Text style={styles.label}>Proveedor / Marca</Text>
                    <TextInput style={styles.input} value={editData.Proveedor} onChangeText={(v) => setEditData({...editData, Proveedor: v})} />
-                </View>
-                <View style={styles.col}>
-                  <Text style={styles.label}>Categoría</Text>
-                  <TextInput style={styles.input} value={editData.Categoria} onChangeText={(v) => setEditData({...editData, Categoria: v})} />
-                </View>
+                  </View>
+                  <View style={styles.col}>
+                    <Text style={styles.label}>Categoría</Text>
+                    <TextInput style={styles.input} value={editData.Categoria} onChangeText={(v) => setEditData({...editData, Categoria: v})} />
+                  </View>
                 </View>
 
                 <View style={styles.porcentajesBox}>
@@ -640,7 +718,16 @@ export default function ProductosScreen({ navigation }: any) {
               
               {editData.lista_variantes?.map((variante: any, index: number) => (
                 <View key={index} style={styles.varianteBox}>
-                  <Text style={styles.varianteTitle}>Variante #{index + 1}</Text>
+                  <View style={styles.varianteHeaderRow}>
+                    <Text style={styles.varianteTitle}>Variante #{index + 1}</Text>
+                    <TouchableOpacity 
+                      onPress={() => confirmarEliminarVariante(index)} 
+                      style={styles.btnTrashVariante}
+                      disabled={deleting}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#d82c0d" />
+                    </TouchableOpacity>
+                  </View>
                   
                   <View style={styles.row}>
                     <View style={styles.col}>
@@ -698,7 +785,7 @@ export default function ProductosScreen({ navigation }: any) {
         </ScrollView>
 
         <View style={styles.footerButtons}>
-          <TouchableOpacity style={[styles.btn, styles.btnGuardar]} onPress={handleSaveCompleto} disabled={saving}>
+          <TouchableOpacity style={[styles.btn, styles.btnGuardar]} onPress={handleSaveCompleto} disabled={saving || deleting}>
             <Text style={styles.btnText}>{saving ? "GUARDANDO..." : "GUARDAR PRODUCTO"}</Text>
           </TouchableOpacity>
         </View>
@@ -757,7 +844,9 @@ const styles = StyleSheet.create({
   statusDescription: { fontSize: 12, color: '#6d7175', fontStyle: 'italic' },
   porcentajesBox: { backgroundColor: '#fafafa', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e4e5e7', marginTop: 5 },
   varianteBox: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e4e5e7' },
-  varianteTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#202223' },
+  varianteHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  varianteTitle: { fontSize: 14, fontWeight: 'bold', color: '#202223' },
+  btnTrashVariante: { padding: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   col: { flex: 0.48 },
   label: { fontSize: 12, color: '#6d7175', marginBottom: 4, fontWeight: '500' },
