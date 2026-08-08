@@ -7,7 +7,7 @@ import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
+const API_BASE_URL = 'http://150.136.39.43/index.php';
 
 export default function InventarioScreen({ navigation }: any) {
   const [inventario, setInventario] = useState<any[]>([]);

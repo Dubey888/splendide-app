@@ -6,7 +6,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const API_BASE_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
+const API_BASE_URL = 'http://150.136.39.43/index.php';
 
 const mostrarAlerta = (mensaje: string) => {
   if (Platform.OS === 'web') window.alert(mensaje);

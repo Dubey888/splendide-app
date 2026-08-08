@@ -8,8 +8,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons'; 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
-const API_BASE_URL = 'https://app-23c8f020-a783-451d-b1cf-b48a15a79604.cleverapps.io/index.php';
-const URL_TIENDA_WEB = 'https://app-8bd88649-a976-47fc-9453-ddce1d45a3fd.cleverapps.io/producto/'; 
+const API_BASE_URL = 'http://150.136.39.43/index.php';
+const URL_TIENDA_WEB = 'https://splendide-web.vercel.app/producto/'; 
 
 // Función para limpiar y generar el handle automáticamente
 const generarHandleAutomatico = (texto: string) => {
