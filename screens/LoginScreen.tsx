@@ -6,7 +6,7 @@ import {
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://150.136.39.43/index.php';
+const API_BASE_URL = 'https://150.136.39.43/index.php';
 
 const mostrarAlertaSegura = (mensaje: string) => {
   if (Platform.OS === 'web') {

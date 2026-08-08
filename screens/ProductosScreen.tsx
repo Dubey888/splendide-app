@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons'; 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
-const API_BASE_URL = 'http://150.136.39.43/index.php';
+const API_BASE_URL = 'https://150.136.39.43/index.php';
 const URL_TIENDA_WEB = 'https://splendide-web.vercel.app/producto/'; 
 
 // Función para limpiar y generar el handle automáticamente

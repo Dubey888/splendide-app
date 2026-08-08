@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-const API_URL = 'http://150.136.39.43/index.php';
+const API_URL = 'https://150.136.39.43/index.php';
 
 export default function ColeccionesScreen({ navigation }: any) {
   const [colecciones, setColecciones] = useState<any[]>([]);

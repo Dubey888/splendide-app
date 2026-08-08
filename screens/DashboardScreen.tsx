@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 
 // Asegúrate de que esta URL apunte correctamente a tu index.php
-const API_BASE_URL = 'http://150.136.39.43/index.php';
+const API_BASE_URL = 'https://150.136.39.43/index.php';
 
 export default function DashboardScreen({ navigation }: any) {
   const [periodo, setPeriodo] = useState('Últimos 30 días');
